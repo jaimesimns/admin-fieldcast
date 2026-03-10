@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FIELDCAST — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  :root {
+    --ink: #0a0a0f;
+    --paper: #f0ede6;
+    --signal: #e8ff3c;
+    --signal2: #3cffe8;
+    --muted: #6b6860;
+    --border: #2a2a35;
+    --card: #13131e;
+    --accent: #ff5c3c;
+    --glass: rgba(10,10,15,0.85);
+    --exp: #b07cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Mono', monospace; background: var(--ink); color: var(--paper); height: 100dvh; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; }
+
+  /* HEADER */
+  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: var(--ink); border-bottom: 1px solid var(--border); z-index: 1000; gap: 12px; }
+  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; letter-spacing: -0.03em; color: var(--signal); line-height: 1; }
+  .logo span { color: var(--paper); opacity: 0.4; font-weight: 400; }
+  .logo sub { font-size: 0.55rem; color: var(--accent); letter-spacing: 0.1em; vertical-align: super; margin-left: 4px; }
+  .gps-status { display: flex; align-items: center; gap: 8px; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em; }
+  .gps-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.5s; }
+  .gps-dot.active { background: var(--signal); box-shadow: 0 0 8px var(--signal); animation: pulse 2s infinite; }
+  .gps-dot.searching { background: #ffaa00; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+  .header-tabs { display: flex; gap: 4px; }
+  .tab-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.06em; cursor: pointer; transition: all 0.2s; }
+  .tab-btn.active { background: var(--card); color: var(--paper); border-color: var(--signal); }
+  .tab-btn.exp-tab.active { border-color: var(--exp); color: var(--exp); }
+
+  /* MAP VIEW */
+  #mapView { display: grid; grid-template-rows: 1fr; height: 100%; }
+  #map { width: 100%; height: 100%; background: #0d0d18; }
+  .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.95) saturate(0.7); }
+
+  /* EXPERIENCES VIEW */
+  #expView { display: none; height: 100%; overflow-y: auto; padding: 20px; }
+  #expView::-webkit-scrollbar { width: 4px; }
+  #expView::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .exp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .exp-header h2 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; }
+  .btn-new-exp { padding: 8px 16px; background: var(--exp); color: var(--ink); border: none; border-radius: 8px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+  .btn-new-exp:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(176,124,255,0.4); }
+
+  .exp-list { display: flex; flex-direction: column; gap: 12px; }
+  .exp-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: border-color 0.2s; }
+  .exp-card:hover { border-color: var(--exp); }
+  .exp-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .exp-card-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; }
+  .exp-card-meta { font-size: 0.65rem; color: var(--muted); margin-top: 3px; letter-spacing: 0.03em; }
+  .exp-card-desc { font-size: 0.75rem; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+  .exp-card-markers { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .marker-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); font-size: 0.6rem; letter-spacing: 0.04em; color: var(--muted); background: rgba(255,255,255,0.03); }
+  .marker-chip.audio { border-color: rgba(232,255,60,0.3); color: var(--signal); }
+  .marker-chip.photo { border-color: rgba(60,255,232,0.3); color: var(--signal2); }
+  .marker-chip.scan3d { border-color: rgba(255,92,60,0.3); color: var(--accent); }
+  .exp-card-actions { display: flex; gap: 8px; }
+  .btn-exp-action { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em; }
+  .btn-exp-edit { border-color: rgba(176,124,255,0.4); color: var(--exp); }
+  .btn-exp-edit:hover { background: rgba(176,124,255,0.1); }
+  .btn-exp-delete:hover { border-color: var(--accent); color: var(--accent); }
+  .exp-status { display: flex; align-items: center; gap: 6px; }
+  .status-badge { font-size: 0.6rem; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 20px; border: 1px solid; }
+  .status-published { border-color: var(--signal); color: var(--signal); background: rgba(232,255,60,0.1); }
+  .status-draft { border-color: var(--border); color: var(--muted); }
+
+  .empty-state { text-align: center; padding: 60px 20px; }
+  .empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
+  .empty-text { font-size: 0.8rem; color: var(--muted); line-height: 1.7; }
+
+  /* BOTTOM BAR */
+  .bottom-bar { background: var(--ink); border-top: 1px solid var(--border); padding: 12px 20px 16px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
+  .now-playing { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .now-playing.hidden { display: none; }
+  .waveform { display: flex; align-items: center; gap: 2px; height: 24px; }
+  .waveform-bar { width: 3px; background: var(--signal); border-radius: 2px; animation: wave 1.2s ease-in-out infinite; }
+  .waveform-bar:nth-child(1){animation-delay:0s}.waveform-bar:nth-child(2){animation-delay:0.1s}.waveform-bar:nth-child(3){animation-delay:0.2s}.waveform-bar:nth-child(4){animation-delay:0.3s}.waveform-bar:nth-child(5){animation-delay:0.4s}.waveform-bar:nth-child(6){animation-delay:0.2s}.waveform-bar:nth-child(7){animation-delay:0.1s}
+  @keyframes wave { 0%,100%{height:4px}50%{height:20px} }
+  .waveform.paused .waveform-bar { animation-play-state: paused; height: 4px; }
+  .now-playing-info { flex: 1; min-width: 0; }
+  .now-playing-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .now-playing-meta { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+  .play-controls { display: flex; gap: 6px; }
+  .btn-play { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--signal); background: transparent; color: var(--signal); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; transition: all 0.15s; }
+  .btn-play:hover { background: var(--signal); color: var(--ink); }
+  .btn-stop { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; transition: all 0.15s; }
+  .btn-stop:hover { border-color: var(--accent); color: var(--accent); }
+  .action-row { display: flex; gap: 8px; }
+  .btn-add { flex: 1; background: var(--signal); color: var(--ink); border: none; border-radius: 10px; padding: 12px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem; letter-spacing: -0.01em; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; }
+  .btn-add:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(232,255,60,0.3); }
+  .btn-locate { width: 46px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; color: var(--paper); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: all 0.15s; flex-shrink: 0; }
+  .btn-locate:hover { border-color: var(--signal2); color: var(--signal2); }
+  .stats-bar { display: flex; gap: 16px; padding: 4px 0 0; }
+  .stat { display: flex; align-items: center; gap: 5px; font-size: 0.65rem; color: var(--muted); }
+  .stat-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .stat-dot.audio { background: var(--signal); }
+  .stat-dot.photo { background: var(--signal2); }
+  .stat-dot.scan3d { background: var(--accent); }
+  .stat-dot.exp { background: var(--exp); }
+  .stat-count { color: var(--paper); font-weight: 500; }
+
+  /* MODALS */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 20px 20px 0 0; width: 100%; max-width: 600px; padding: 20px 24px 40px; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.34,1.1,0.64,1); max-height: 92dvh; overflow-y: auto; }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; flex-shrink: 0; }
+  .modal-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.3rem; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .modal-subtitle { font-size: 0.7rem; color: var(--muted); margin-bottom: 20px; letter-spacing: 0.04em; }
+
+  /* MARKER TYPE SELECTOR */
+  .type-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 20px; }
+  .type-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.03); }
+  .type-card:hover { border-color: var(--signal); }
+  .type-card.selected { border-color: var(--signal); background: rgba(232,255,60,0.1); }
+  .type-card.selected.photo { border-color: var(--signal2); background: rgba(60,255,232,0.1); }
+  .type-card.selected.scan3d { border-color: var(--accent); background: rgba(255,92,60,0.1); }
+  .type-card-icon { font-size: 1.6rem; margin-bottom: 6px; }
+  .type-card-label { font-size: 0.65rem; letter-spacing: 0.06em; color: var(--muted); }
+  .type-card.selected .type-card-label { color: var(--paper); }
+
+  /* FORM */
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 0.65rem; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+  .form-input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--paper); font-family: 'DM Mono', monospace; font-size: 0.85rem; outline: none; transition: border-color 0.2s; }
+  .form-input:focus { border-color: var(--signal); }
+  .form-input::placeholder { color: var(--muted); }
+  textarea.form-input { resize: vertical; min-height: 72px; line-height: 1.5; }
+  .file-drop { border: 1px dashed var(--border); border-radius: 10px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+  .file-drop:hover { border-color: var(--signal); background: rgba(232,255,60,0.04); }
+  .file-drop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .file-drop-icon { font-size: 1.8rem; margin-bottom: 8px; }
+  .file-drop-text { font-size: 0.7rem; color: var(--muted); letter-spacing: 0.04em; }
+  .file-drop-name { font-size: 0.75rem; color: var(--signal); margin-top: 6px; }
+  .coord-display { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .coord-box { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 0.75rem; color: var(--muted); }
+  .coord-box span { display: block; color: var(--paper); font-size: 0.8rem; margin-top: 2px; }
+  .btn-submit { width: 100%; margin-top: 16px; padding: 14px; border-radius: 10px; border: none; background: var(--signal); color: var(--ink); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; cursor: pointer; letter-spacing: -0.01em; transition: all 0.15s; }
+  .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(232,255,60,0.4); }
+  .btn-submit.photo { background: var(--signal2); }
+  .btn-submit.scan3d { background: var(--accent); color: #fff; }
+  .btn-submit.exp { background: var(--exp); color: var(--ink); }
+  .btn-submit.exp:hover { box-shadow: 0 4px 20px rgba(176,124,255,0.4); }
+  .btn-cancel { width: 100%; margin-top: 8px; padding: 10px; background: transparent; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.8rem; cursor: pointer; letter-spacing: 0.04em; }
+  input[type=range] { -webkit-appearance: none; width: 100%; height: 3px; background: var(--border); border-radius: 2px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--signal); cursor: pointer; }
+
+  /* RECORDING */
+  .rec-controls { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .btn-record { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--accent); background: rgba(255,92,60,0.1); color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: all 0.15s; flex-shrink: 0; }
+  .btn-record.recording { background: var(--accent); color: #fff; animation: pulse 1s infinite; }
+  .rec-timer { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rec-timer.active { color: var(--accent); }
+  .rec-status { font-size: 0.7rem; color: var(--muted); }
+
+  /* EXPERIENCE BUILDER */
+  .marker-select-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; max-height: 260px; overflow-y: auto; }
+  .marker-select-list::-webkit-scrollbar { width: 4px; }
+  .marker-select-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .marker-select-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); cursor: pointer; transition: all 0.15s; }
+  .marker-select-item:hover { border-color: var(--exp); }
+  .marker-select-item.selected { border-color: var(--exp); background: rgba(176,124,255,0.08); }
+  .marker-select-check { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; transition: all 0.15s; }
+  .marker-select-item.selected .marker-select-check { background: var(--exp); border-color: var(--exp); color: var(--ink); }
+  .marker-select-icon { font-size: 1.1rem; }
+  .marker-select-info { flex: 1; min-width: 0; }
+  .marker-select-name { font-size: 0.8rem; font-family: 'Syne', sans-serif; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .marker-select-type { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.05em; }
+
+  /* ORDER HANDLES */
+  .order-list { display: flex; flex-direction: column; gap: 6px; }
+  .order-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(176,124,255,0.06); border: 1px solid rgba(176,124,255,0.2); border-radius: 8px; font-size: 0.75rem; }
+  .order-num { width: 22px; height: 22px; border-radius: 50%; background: var(--exp); color: var(--ink); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+  .order-name { flex: 1; font-family: 'Syne', sans-serif; font-weight: 600; }
+  .btn-order-up, .btn-order-down { width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .btn-order-up:hover, .btn-order-down:hover { border-color: var(--exp); color: var(--exp); }
+
+  /* CUSTOM MARKERS */
+  .custom-marker { position: relative; cursor: pointer; }
+  .marker-ring { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--signal); background: rgba(232,255,60,0.1); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); transition: all 0.2s; animation: markerPop 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+  .marker-ring.audio { border-color: var(--signal); background: rgba(232,255,60,0.15); }
+  .marker-ring.photo { border-color: var(--signal2); background: rgba(60,255,232,0.15); }
+  .marker-ring.scan3d { border-color: var(--accent); background: rgba(255,92,60,0.15); }
+  .marker-ring.playing { box-shadow: 0 0 0 8px rgba(232,255,60,0.15); animation: markerPulse 2s infinite; }
+  .marker-ring.in-exp { box-shadow: 0 0 0 5px rgba(176,124,255,0.3); }
+  @keyframes markerPop { from{transform:scale(0) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1} }
+  @keyframes markerPulse { 0%,100%{box-shadow:0 0 0 4px rgba(232,255,60,0.2)}50%{box-shadow:0 0 0 12px rgba(232,255,60,0.05)} }
+  .marker-icon { font-size: 1.1rem; line-height: 1; }
+  .marker-label { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); background: var(--glass); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 0.6rem; white-space: nowrap; color: var(--paper); backdrop-filter: blur(8px); pointer-events: none; letter-spacing: 0.05em; }
+
+  /* DETAIL PANEL */
+  .detail-panel { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+  .detail-panel.open { opacity: 1; pointer-events: all; }
+  .detail-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px 20px 0 0; width: 100%; max-width: 600px; padding: 20px 24px 40px; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.34,1.1,0.64,1); max-height: 80vh; overflow-y: auto; }
+  .detail-panel.open .detail-card { transform: translateY(0); }
+  .detail-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+  .detail-type-badge { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; border: 1px solid; margin-bottom: 8px; display: inline-block; }
+  .badge-audio { border-color: var(--signal); color: var(--signal); background: rgba(232,255,60,0.1); }
+  .badge-photo { border-color: var(--signal2); color: var(--signal2); background: rgba(60,255,232,0.1); }
+  .badge-scan3d { border-color: var(--accent); color: var(--accent); background: rgba(255,92,60,0.1); }
+  .detail-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.2rem; letter-spacing: -0.02em; }
+  .detail-desc { font-size: 0.78rem; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+  .btn-close { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1rem; transition: all 0.15s; }
+  .btn-close:hover { border-color: var(--accent); color: var(--accent); }
+  .detail-media { margin: 16px 0; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
+  .audio-player { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .audio-wave-vis { height: 48px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .audio-bar { width: 4px; border-radius: 2px; background: var(--signal); opacity: 0.7; }
+  .audio-controls { display: flex; align-items: center; gap: 12px; }
+  .btn-play-large { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--signal); background: rgba(232,255,60,0.1); color: var(--signal); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; transition: all 0.15s; flex-shrink: 0; }
+  .btn-play-large:hover { background: var(--signal); color: var(--ink); }
+  .audio-filename { font-size: 0.7rem; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .audio-time { font-size: 0.7rem; color: var(--muted); }
+  .photo-preview { width: 100%; max-height: 280px; object-fit: cover; }
+  .scan3d-viewer { padding: 20px; text-align: center; min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+  .scan3d-icon { font-size: 3rem; opacity: 0.6; }
+  .scan3d-name { font-size: 0.8rem; color: var(--muted); }
+  .detail-coords { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+  .btn-play-here { width: 100%; margin-top: 16px; padding: 13px; border-radius: 10px; border: none; background: var(--signal); color: var(--ink); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-play-here.photo { background: var(--signal2); }
+  .btn-play-here.scan3d { background: var(--accent); color: #fff; }
+  .btn-play-here:hover { transform: translateY(-1px); }
+  .btn-delete-marker { width: 100%; margin-top: 8px; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,92,60,0.3); background: transparent; color: var(--accent); font-family: 'DM Mono', monospace; font-size: 0.75rem; cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em; }
+  .btn-delete-marker:hover { background: rgba(255,92,60,0.1); }
+
+  /* TOAST */
+  .toast { position: fixed; top: 72px; left: 50%; transform: translateX(-50%) translateY(-20px); background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 18px; font-size: 0.75rem; color: var(--paper); letter-spacing: 0.04em; z-index: 9999; opacity: 0; transition: all 0.3s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--signal); }
+  .toast.error { border-color: var(--accent); }
+  .toast.exp { border-color: var(--exp); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* export banner */
+  .export-bar { background: rgba(176,124,255,0.08); border: 1px solid rgba(176,124,255,0.2); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .export-bar-text { font-size: 0.7rem; color: var(--muted); }
+  .btn-export { padding: 7px 14px; background: var(--exp); color: var(--ink); border: none; border-radius: 6px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.7rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .btn-export:hover { box-shadow: 0 2px 12px rgba(176,124,255,0.4); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FIELD<span>CAST</span><sub>ADMIN</sub></div>
+  <div class="gps-status">
+    <div class="gps-dot" id="gpsDot"></div>
+    <span id="gpsText">LOCATING...</span>
+  </div>
+  <div class="header-tabs">
+    <button class="tab-btn active" id="tabMap" onclick="switchTab('map')">MAP</button>
+    <button class="tab-btn exp-tab" id="tabExp" onclick="switchTab('exp')">EXPERIENCES</button>
+  </div>
+</header>
+
+<div id="mapView">
+  <div id="map"></div>
+</div>
+
+<div id="expView">
+  <div class="export-bar">
+    <div class="export-bar-text">Export data for the visitor app — download <code>fieldcast-data.json</code> and place it next to <code>visitor.html</code></div>
+    <button class="btn-export" onclick="exportData()">⬇ EXPORT JSON</button>
+  </div>
+  <div class="exp-header">
+    <h2>Audio Experiences</h2>
+    <button class="btn-new-exp" onclick="openNewExp()">+ New Experience</button>
+  </div>
+  <div class="exp-list" id="expList"></div>
+</div>
+
+<div class="bottom-bar">
+  <div class="now-playing hidden" id="nowPlaying">
+    <div class="waveform" id="waveform">
+      <div class="waveform-bar" style="height:8px"></div>
+      <div class="waveform-bar" style="height:14px"></div>
+      <div class="waveform-bar" style="height:18px"></div>
+      <div class="waveform-bar" style="height:10px"></div>
+      <div class="waveform-bar" style="height:20px"></div>
+      <div class="waveform-bar" style="height:12px"></div>
+      <div class="waveform-bar" style="height:6px"></div>
+    </div>
+    <div class="now-playing-info">
+      <div class="now-playing-title" id="nowPlayingTitle">—</div>
+      <div class="now-playing-meta" id="nowPlayingMeta">—</div>
+    </div>
+    <div class="play-controls">
+      <button class="btn-play" id="btnPlayPause">▶</button>
+      <button class="btn-stop" id="btnStop">■</button>
+    </div>
+  </div>
+  <div class="action-row" id="mapActions">
+    <button class="btn-add" id="btnAddMarker">+ ADD MARKER</button>
+    <button class="btn-locate" id="btnLocate" title="Center on location">⌖</button>
+  </div>
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-dot audio"></div><span class="stat-count" id="countAudio">0</span> audio</div>
+    <div class="stat"><div class="stat-dot photo"></div><span class="stat-count" id="countPhoto">0</span> photo</div>
+    <div class="stat"><div class="stat-dot scan3d"></div><span class="stat-count" id="count3d">0</span> 3D</div>
+    <div class="stat"><div class="stat-dot exp"></div><span class="stat-count" id="countExp">0</span> experiences</div>
+  </div>
+</div>
+
+<!-- ADD MARKER MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">New Marker</div>
+    <div class="modal-subtitle">TAP MAP TO SET LOCATION · OR USE GPS</div>
+    <div class="type-grid">
+      <div class="type-card selected" data-type="audio"><div class="type-card-icon">🎙</div><div class="type-card-label">AUDIO</div></div>
+      <div class="type-card" data-type="photo"><div class="type-card-icon">📷</div><div class="type-card-label">PHOTO</div></div>
+      <div class="type-card" data-type="scan3d"><div class="type-card-icon">🧊</div><div class="type-card-label">3D SCAN</div></div>
+    </div>
+    <div class="form-group"><label class="form-label">TITLE</label><input class="form-input" id="markerTitle" type="text" placeholder="Name this place..."></div>
+    <div class="form-group"><label class="form-label">DESCRIPTION</label><textarea class="form-input" id="markerDesc" placeholder="What should visitors know?"></textarea></div>
+    <div id="audioSection">
+      <div class="form-group"><label class="form-label">AUDIO FILE</label>
+        <div class="file-drop"><input type="file" id="audioFile" accept="audio/*"><div class="file-drop-icon">🎵</div><div class="file-drop-text">DROP AUDIO OR CLICK TO BROWSE</div><div class="file-drop-name" id="audioFileName"></div></div>
+      </div>
+      <div class="form-group"><label class="form-label">— OR RECORD —</label>
+        <div class="rec-controls">
+          <button class="btn-record" id="btnRecord">⏺</button>
+          <div><div class="rec-timer" id="recTimer">00:00</div><div class="rec-status" id="recStatus">Tap to record</div></div>
+        </div>
+      </div>
+    </div>
+    <div id="photoSection" style="display:none">
+      <div class="form-group"><label class="form-label">PHOTO</label>
+        <div class="file-drop"><input type="file" id="photoFile" accept="image/*" capture="environment"><div class="file-drop-icon">📸</div><div class="file-drop-text">TAKE PHOTO OR BROWSE</div><div class="file-drop-name" id="photoFileName"></div></div>
+      </div>
+      <div class="form-group"><label class="form-label">COMPASS DIRECTION (optional)</label><input class="form-input" id="photoDirection" type="number" placeholder="0–360°" min="0" max="360"></div>
+    </div>
+    <div id="scan3dSection" style="display:none">
+      <div class="form-group"><label class="form-label">3D SCAN FILE (.glb, .gltf, .obj, .ply)</label>
+        <div class="file-drop"><input type="file" id="scanFile" accept=".glb,.gltf,.obj,.ply,.usdz,.splat"><div class="file-drop-icon">🧊</div><div class="file-drop-text">UPLOAD 3D SCAN FILE</div><div class="file-drop-name" id="scanFileName"></div></div>
+      </div>
+      <div class="form-group"><label class="form-label">SCAN TYPE</label>
+        <select class="form-input" id="scanType"><option value="photogrammetry">Photogrammetry (.glb/.obj)</option><option value="lidar">LiDAR Scan (.ply)</option><option value="gaussian">Gaussian Splat (.splat)</option><option value="usdz">USDZ (Apple AR)</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">LOCATION</label>
+      <div class="coord-display"><div class="coord-box">LAT<span id="pendingLat">—</span></div><div class="coord-box">LON<span id="pendingLon">—</span></div></div>
+    </div>
+    <div class="form-group"><label class="form-label">TRIGGER RADIUS (meters)</label>
+      <input type="range" id="triggerRadius" min="5" max="200" value="30" oninput="document.getElementById('radiusVal').textContent=this.value">
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;text-align:right"><span id="radiusVal">30</span>m</div>
+    </div>
+    <button class="btn-submit" id="btnSubmitMarker">PLACE MARKER</button>
+    <button class="btn-cancel" id="btnCancelModal">cancel</button>
+  </div>
+</div>
+
+<!-- NEW EXPERIENCE MODAL -->
+<div class="modal-overlay" id="expModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="expModalTitle">New Experience</div>
+    <div class="modal-subtitle">SELECT MARKERS · SET ORDER · PUBLISH</div>
+
+    <div class="form-group"><label class="form-label">EXPERIENCE TITLE</label><input class="form-input" id="expTitle" type="text" placeholder="e.g. The Old Quarter Walk"></div>
+    <div class="form-group"><label class="form-label">TAGLINE</label><input class="form-input" id="expTagline" type="text" placeholder="A short, evocative description..."></div>
+    <div class="form-group"><label class="form-label">FULL DESCRIPTION</label><textarea class="form-input" id="expDesc" placeholder="Tell visitors what to expect..."></textarea></div>
+    <div class="form-group"><label class="form-label">COVER IMAGE URL (optional)</label><input class="form-input" id="expCover" type="text" placeholder="https://..."></div>
+    <div class="form-group"><label class="form-label">ESTIMATED DURATION</label><input class="form-input" id="expDuration" type="text" placeholder="e.g. 45 min · 1.2 km"></div>
+
+    <div class="form-group">
+      <label class="form-label">SELECT MARKERS</label>
+      <div class="marker-select-list" id="markerSelectList"></div>
+    </div>
+
+    <div class="form-group" id="orderSection" style="display:none">
+      <label class="form-label">PLAYBACK ORDER</label>
+      <div class="order-list" id="orderList"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">STATUS</label>
+      <select class="form-input" id="expStatus"><option value="draft">Draft (not visible to visitors)</option><option value="published">Published (visible to visitors)</option></select>
+    </div>
+
+    <button class="btn-submit exp" id="btnSubmitExp">SAVE EXPERIENCE</button>
+    <button class="btn-cancel" id="btnCancelExp">cancel</button>
+  </div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-card">
+    <div class="detail-header">
+      <div>
+        <div class="detail-type-badge" id="detailBadge">AUDIO</div>
+        <div class="detail-title" id="detailTitle">—</div>
+        <div class="detail-desc" id="detailDesc">—</div>
+      </div>
+      <button class="btn-close" id="btnCloseDetail">✕</button>
+    </div>
+    <div class="detail-media" id="detailMedia"></div>
+    <div class="detail-coords"><div class="coord-box">LAT<span id="detailLat">—</span></div><div class="coord-box">LON<span id="detailLon">—</span></div></div>
+    <button class="btn-play-here" id="btnPlayHere">▶ PLAY</button>
+    <button class="btn-delete-marker" id="btnDeleteMarker">DELETE MARKER</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+const state = {
+  markers: [], experiences: [],
+  userLat: null, userLon: null,
+  pendingLat: null, pendingLon: null,
+  markerType: 'audio',
+  currentAudio: null, isPlaying: false,
+  mediaStore: {},
+  recording: false, recorder: null, recChunks: [], recInterval: null, recSeconds: 0,
+  recordingBlob: null,
+  leafletMarkers: {}, proximityCircles: {},
+  userMarker: null,
+  editingExpId: null,
+  selectedMarkerIds: [],
+  orderedMarkerIds: [],
+};
+
+try { state.markers = JSON.parse(localStorage.getItem('fieldcast_markers') || '[]'); } catch(e){}
+try { state.experiences = JSON.parse(localStorage.getItem('fieldcast_experiences') || '[]'); } catch(e){}
+
+// ═══════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════
+const map = L.map('map', { center: [51.505,-0.09], zoom: 16, zoomControl: false, attributionControl: false });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+// GPS
+const gpsDot = document.getElementById('gpsDot');
+const gpsText = document.getElementById('gpsText');
+gpsDot.className = 'gps-dot searching';
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(pos => {
+    state.userLat = pos.coords.latitude;
+    state.userLon = pos.coords.longitude;
+    gpsDot.className = 'gps-dot active';
+    gpsText.textContent = `${state.userLat.toFixed(4)}°`;
+    if (!state.userMarker) map.setView([state.userLat, state.userLon], 16);
+    updateUserMarker();
+  }, () => { gpsDot.className='gps-dot'; gpsText.textContent='NO GPS'; map.setView([51.505,-0.09],15); },
+  { enableHighAccuracy: true, maximumAge: 5000 });
+} else { gpsText.textContent='NO GPS'; map.setView([51.505,-0.09],15); }
+
+function updateUserMarker() {
+  if (!state.userLat) return;
+  const ll = [state.userLat, state.userLon];
+  if (state.userMarker) { state.userMarker.setLatLng(ll); return; }
+  const icon = L.divIcon({ className:'', html:`<div style="width:20px;height:20px;border-radius:50%;background:var(--signal);border:3px solid var(--ink);box-shadow:0 0 0 4px rgba(232,255,60,0.3)"></div>`, iconSize:[20,20], iconAnchor:[10,10] });
+  state.userMarker = L.marker(ll, { icon, zIndexOffset: 1000 }).addTo(map);
+}
+
+map.on('click', e => {
+  if (document.getElementById('addModal').classList.contains('open')) {
+    state.pendingLat = e.latlng.lat;
+    state.pendingLon = e.latlng.lng;
+    updatePendingCoords();
+    showToast('📍 Location set', 'success');
+  }
+});
+
+// ═══════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════
+function switchTab(tab) {
+  document.getElementById('tabMap').classList.toggle('active', tab==='map');
+  document.getElementById('tabExp').classList.toggle('active', tab==='exp');
+  document.getElementById('mapView').style.display = tab==='map' ? '' : 'none';
+  document.getElementById('expView').style.display = tab==='exp' ? '' : 'none';
+  document.getElementById('mapActions').style.display = tab==='map' ? '' : 'none';
+  if (tab==='exp') renderExpList();
+  if (tab==='map') setTimeout(()=>map.invalidateSize(),50);
+}
+
+// ═══════════════════════════════════════
+// MARKER RENDERING
+// ═══════════════════════════════════════
+function getMarkerIcon(type, title, playing=false, inExp=false) {
+  const icons = { audio:'🎙', photo:'📷', scan3d:'🧊' };
+  return L.divIcon({
+    className:'',
+    html:`<div class="custom-marker"><div class="marker-label">${title}</div><div class="marker-ring ${type}${playing?' playing':''}${inExp?' in-exp':''}"><div class="marker-icon">${icons[type]}</div></div></div>`,
+    iconSize:[44,44], iconAnchor:[22,22],
+  });
+}
+
+function getMarkersInAnyExp() {
+  const ids = new Set();
+  state.experiences.forEach(e => (e.markerIds||[]).forEach(id => ids.add(id)));
+  return ids;
+}
+
+function renderAllMarkers() {
+  Object.values(state.leafletMarkers).forEach(m=>m.remove());
+  Object.values(state.proximityCircles).forEach(c=>c.remove());
+  state.leafletMarkers={}; state.proximityCircles={};
+  const inExp = getMarkersInAnyExp();
+  state.markers.forEach(m => addLeafletMarker(m, inExp.has(m.id)));
+  updateStats();
+}
+
+function addLeafletMarker(m, inExp=false) {
+  const lm = L.marker([m.lat,m.lon], { icon: getMarkerIcon(m.type, m.title, false, inExp) })
+    .addTo(map).on('click', ()=>openDetail(m.id));
+  state.leafletMarkers[m.id] = lm;
+  const color = m.type==='audio'?'#e8ff3c':m.type==='photo'?'#3cffe8':'#ff5c3c';
+  const circle = L.circle([m.lat,m.lon], { radius:m.radius||30, color, fillColor:color, fillOpacity:0.05, weight:1, dashArray:'4 4' }).addTo(map);
+  state.proximityCircles[m.id] = circle;
+}
+
+// ═══════════════════════════════════════
+// ADD MARKER
+// ═══════════════════════════════════════
+document.getElementById('btnAddMarker').onclick = () => {
+  if (state.userLat) { state.pendingLat=state.userLat; state.pendingLon=state.userLon; updatePendingCoords(); }
+  document.getElementById('addModal').classList.add('open');
+  resetMarkerForm();
+};
+document.getElementById('btnCancelModal').onclick = closeMarkerModal;
+document.getElementById('addModal').addEventListener('click', e=>{ if(e.target===document.getElementById('addModal')) closeMarkerModal(); });
+
+function closeMarkerModal() { document.getElementById('addModal').classList.remove('open'); stopRecording(); }
+
+document.querySelectorAll('.type-card').forEach(card => {
+  card.onclick = () => {
+    document.querySelectorAll('.type-card').forEach(c=>c.classList.remove('selected','photo','scan3d'));
+    card.classList.add('selected', card.dataset.type);
+    state.markerType = card.dataset.type;
+    document.getElementById('audioSection').style.display = state.markerType==='audio'?'':'none';
+    document.getElementById('photoSection').style.display = state.markerType==='photo'?'':'none';
+    document.getElementById('scan3dSection').style.display = state.markerType==='scan3d'?'':'none';
+    const btn = document.getElementById('btnSubmitMarker');
+    btn.className = `btn-submit ${state.markerType==='audio'?'':state.markerType}`;
+  };
+});
+
+document.getElementById('audioFile').onchange = e => { const f=e.target.files[0]; if(f) document.getElementById('audioFileName').textContent=f.name; };
+document.getElementById('photoFile').onchange = e => { const f=e.target.files[0]; if(f) document.getElementById('photoFileName').textContent=f.name; };
+document.getElementById('scanFile').onchange = e => { const f=e.target.files[0]; if(f) document.getElementById('scanFileName').textContent=f.name; };
+
+// Recording
+document.getElementById('btnRecord').onclick = async () => {
+  if (state.recording) { stopRecording(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    state.recChunks = [];
+    state.recorder = new MediaRecorder(stream);
+    state.recorder.ondataavailable = e => state.recChunks.push(e.data);
+    state.recorder.onstop = () => {
+      const blob = new Blob(state.recChunks, { type:'audio/webm' });
+      state.recordingBlob = blob;
+      document.getElementById('recStatus').textContent = 'Recording saved ✓';
+      document.getElementById('audioFileName').textContent = `recording_${Date.now()}.webm`;
+    };
+    state.recorder.start();
+    state.recording = true; state.recSeconds = 0;
+    document.getElementById('btnRecord').classList.add('recording');
+    document.getElementById('recStatus').textContent = 'Recording...';
+    state.recInterval = setInterval(()=>{
+      state.recSeconds++;
+      const m=Math.floor(state.recSeconds/60).toString().padStart(2,'0');
+      const s=(state.recSeconds%60).toString().padStart(2,'0');
+      document.getElementById('recTimer').textContent=`${m}:${s}`;
+      document.getElementById('recTimer').classList.add('active');
+    },1000);
+  } catch(e) { showToast('Microphone access denied','error'); }
+};
+
+function stopRecording() {
+  if (state.recorder && state.recording) { state.recorder.stop(); state.recorder.stream.getTracks().forEach(t=>t.stop()); }
+  state.recording=false; clearInterval(state.recInterval);
+  document.getElementById('btnRecord').classList.remove('recording');
+  document.getElementById('recTimer').classList.remove('active');
+}
+
+document.getElementById('btnSubmitMarker').onclick = async () => {
+  const title = document.getElementById('markerTitle').value.trim() || 'Untitled';
+  const desc = document.getElementById('markerDesc').value.trim();
+  const radius = parseInt(document.getElementById('triggerRadius').value);
+  if (!state.pendingLat) { const c=map.getCenter(); state.pendingLat=c.lat; state.pendingLon=c.lng; }
+  const id = `marker_${Date.now()}`;
+  const marker = { id, title, desc, type:state.markerType, lat:state.pendingLat, lon:state.pendingLon, radius, created:new Date().toISOString() };
+  if (state.markerType==='audio') {
+    const f=document.getElementById('audioFile').files[0];
+    if (f) { marker.mediaName=f.name; state.mediaStore[id]=URL.createObjectURL(f); saveMediaToDB(id,f); }
+    else if (state.recordingBlob) { marker.mediaName=`rec_${Date.now()}.webm`; state.mediaStore[id]=URL.createObjectURL(state.recordingBlob); saveMediaToDB(id,state.recordingBlob); state.recordingBlob=null; }
+  } else if (state.markerType==='photo') {
+    const f=document.getElementById('photoFile').files[0];
+    if (f) { marker.mediaName=f.name; marker.direction=document.getElementById('photoDirection').value; state.mediaStore[id]=URL.createObjectURL(f); saveMediaToDB(id,f); }
+  } else if (state.markerType==='scan3d') {
+    const f=document.getElementById('scanFile').files[0];
+    if (f) { marker.mediaName=f.name; marker.scanType=document.getElementById('scanType').value; state.mediaStore[id]=URL.createObjectURL(f); }
+  }
+  state.markers.push(marker);
+  saveMarkers();
+  const inExp = getMarkersInAnyExp();
+  addLeafletMarker(marker, inExp.has(marker.id));
+  updateStats();
+  closeMarkerModal();
+  showToast('✓ Marker placed','success');
+  map.setView([marker.lat,marker.lon], Math.max(map.getZoom(),16));
+};
+
+// ═══════════════════════════════════════
+// EXPERIENCE BUILDER
+// ═══════════════════════════════════════
+function openNewExp() {
+  state.editingExpId = null;
+  state.selectedMarkerIds = [];
+  state.orderedMarkerIds = [];
+  document.getElementById('expModalTitle').textContent = 'New Experience';
+  document.getElementById('expTitle').value='';
+  document.getElementById('expTagline').value='';
+  document.getElementById('expDesc').value='';
+  document.getElementById('expCover').value='';
+  document.getElementById('expDuration').value='';
+  document.getElementById('expStatus').value='draft';
+  buildMarkerSelectList();
+  document.getElementById('expModal').classList.add('open');
+}
+
+function openEditExp(id) {
+  const exp = state.experiences.find(e=>e.id===id);
+  if (!exp) return;
+  state.editingExpId = id;
+  state.selectedMarkerIds = [...(exp.markerIds||[])];
+  state.orderedMarkerIds = [...(exp.markerIds||[])];
+  document.getElementById('expModalTitle').textContent = 'Edit Experience';
+  document.getElementById('expTitle').value=exp.title||'';
+  document.getElementById('expTagline').value=exp.tagline||'';
+  document.getElementById('expDesc').value=exp.desc||'';
+  document.getElementById('expCover').value=exp.cover||'';
+  document.getElementById('expDuration').value=exp.duration||'';
+  document.getElementById('expStatus').value=exp.status||'draft';
+  buildMarkerSelectList();
+  document.getElementById('expModal').classList.add('open');
+}
+
+function buildMarkerSelectList() {
+  const list = document.getElementById('markerSelectList');
+  const typeIcons = { audio:'🎙', photo:'📷', scan3d:'🧊' };
+  if (state.markers.length===0) {
+    list.innerHTML='<div style="font-size:0.75rem;color:var(--muted);padding:12px;text-align:center">No markers yet — add some on the map first.</div>';
+    return;
+  }
+  list.innerHTML = state.markers.map(m=>`
+    <div class="marker-select-item${state.selectedMarkerIds.includes(m.id)?' selected':''}" data-id="${m.id}" onclick="toggleMarkerSelect('${m.id}')">
+      <div class="marker-select-check">${state.selectedMarkerIds.includes(m.id)?'✓':''}</div>
+      <div class="marker-select-icon">${typeIcons[m.type]||'📍'}</div>
+      <div class="marker-select-info">
+        <div class="marker-select-name">${m.title}</div>
+        <div class="marker-select-type">${m.type.toUpperCase()} · ${m.lat.toFixed(4)}, ${m.lon.toFixed(4)}</div>
+      </div>
+    </div>
+  `).join('');
+  renderOrderList();
+}
+
+function toggleMarkerSelect(id) {
+  if (state.selectedMarkerIds.includes(id)) {
+    state.selectedMarkerIds = state.selectedMarkerIds.filter(x=>x!==id);
+    state.orderedMarkerIds = state.orderedMarkerIds.filter(x=>x!==id);
+  } else {
+    state.selectedMarkerIds.push(id);
+    state.orderedMarkerIds.push(id);
+  }
+  buildMarkerSelectList();
+}
+
+function renderOrderList() {
+  const sec = document.getElementById('orderSection');
+  const list = document.getElementById('orderList');
+  if (state.orderedMarkerIds.length===0) { sec.style.display='none'; return; }
+  sec.style.display='';
+  const typeIcons = { audio:'🎙', photo:'📷', scan3d:'🧊' };
+  list.innerHTML = state.orderedMarkerIds.map((id,i)=>{
+    const m = state.markers.find(x=>x.id===id);
+    if (!m) return '';
+    return `<div class="order-item">
+      <div class="order-num">${i+1}</div>
+      <div style="font-size:1rem">${typeIcons[m.type]}</div>
+      <div class="order-name">${m.title}</div>
+      ${i>0?`<button class="btn-order-up" onclick="moveOrder(${i},-1)">▲</button>`:'<div style="width:24px"></div>'}
+      ${i<state.orderedMarkerIds.length-1?`<button class="btn-order-down" onclick="moveOrder(${i},1)">▼</button>`:'<div style="width:24px"></div>'}
+    </div>`;
+  }).join('');
+}
+
+function moveOrder(i, dir) {
+  const arr = state.orderedMarkerIds;
+  const j = i+dir;
+  if (j<0||j>=arr.length) return;
+  [arr[i],arr[j]] = [arr[j],arr[i]];
+  renderOrderList();
+}
+
+document.getElementById('btnSubmitExp').onclick = () => {
+  const title = document.getElementById('expTitle').value.trim();
+  if (!title) { showToast('Please add a title','error'); return; }
+  const exp = {
+    id: state.editingExpId || `exp_${Date.now()}`,
+    title,
+    tagline: document.getElementById('expTagline').value.trim(),
+    desc: document.getElementById('expDesc').value.trim(),
+    cover: document.getElementById('expCover').value.trim(),
+    duration: document.getElementById('expDuration').value.trim(),
+    status: document.getElementById('expStatus').value,
+    markerIds: [...state.orderedMarkerIds],
+    updated: new Date().toISOString(),
+  };
+  if (state.editingExpId) {
+    const idx = state.experiences.findIndex(e=>e.id===state.editingExpId);
+    state.experiences[idx] = exp;
+  } else {
+    exp.created = new Date().toISOString();
+    state.experiences.push(exp);
+  }
+  saveExperiences();
+  renderAllMarkers(); // update in-exp highlights
+  renderExpList();
+  document.getElementById('expModal').classList.remove('open');
+  showToast(`✓ "${title}" saved`,'exp');
+  updateStats();
+};
+
+document.getElementById('btnCancelExp').onclick = () => document.getElementById('expModal').classList.remove('open');
+document.getElementById('expModal').addEventListener('click', e=>{ if(e.target===document.getElementById('expModal')) document.getElementById('expModal').classList.remove('open'); });
+
+function renderExpList() {
+  const list = document.getElementById('expList');
+  const typeIcons = { audio:'🎙', photo:'📷', scan3d:'🧊' };
+  if (state.experiences.length===0) {
+    list.innerHTML=`<div class="empty-state"><div class="empty-icon">🎧</div><div class="empty-text">No experiences yet.<br>Compile your markers into a curated<br>audio tour for visitors.</div></div>`;
+    return;
+  }
+  list.innerHTML = state.experiences.map(exp => {
+    const markers = (exp.markerIds||[]).map(id=>state.markers.find(m=>m.id===id)).filter(Boolean);
+    const chips = markers.map(m=>`<div class="marker-chip ${m.type}">${typeIcons[m.type]} ${m.title}</div>`).join('');
+    return `<div class="exp-card">
+      <div class="exp-card-header">
+        <div>
+          <div class="exp-card-title">${exp.title}</div>
+          <div class="exp-card-meta">${markers.length} markers${exp.duration?' · '+exp.duration:''} · ${new Date(exp.updated||exp.created).toLocaleDateString()}</div>
+        </div>
+        <div class="exp-status"><span class="status-badge ${exp.status==='published'?'status-published':'status-draft'}">${exp.status.toUpperCase()}</span></div>
+      </div>
+      ${exp.tagline?`<div class="exp-card-desc">${exp.tagline}</div>`:''}
+      <div class="exp-card-markers">${chips}</div>
+      <div class="exp-card-actions">
+        <button class="btn-exp-action btn-exp-edit" onclick="openEditExp('${exp.id}')">EDIT</button>
+        <button class="btn-exp-action btn-exp-delete" onclick="deleteExp('${exp.id}')">DELETE</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteExp(id) {
+  if (!confirm('Delete this experience?')) return;
+  state.experiences = state.experiences.filter(e=>e.id!==id);
+  saveExperiences();
+  renderExpList();
+  renderAllMarkers();
+  updateStats();
+}
+
+// ═══════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════
+function exportData() {
+  // Build export: marker metadata only (no blobs — media must be self-hosted)
+  const data = {
+    exported: new Date().toISOString(),
+    version: 1,
+    markers: state.markers.map(m=>({...m})),
+    experiences: state.experiences.filter(e=>e.status==='published'),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fieldcast-data.json';
+  a.click();
+  showToast('Exported fieldcast-data.json','success');
+}
+
+// ═══════════════════════════════════════
+// DETAIL PANEL
+// ═══════════════════════════════════════
+async function openDetail(id) {
+  const m = state.markers.find(x=>x.id===id);
+  if (!m) return;
+  const panel = document.getElementById('detailPanel');
+  const typeClasses = { audio:'badge-audio', photo:'badge-photo', scan3d:'badge-scan3d' };
+  document.getElementById('detailBadge').textContent = m.type.toUpperCase();
+  document.getElementById('detailBadge').className = `detail-type-badge ${typeClasses[m.type]}`;
+  document.getElementById('detailTitle').textContent = m.title;
+  document.getElementById('detailDesc').textContent = m.desc || 'No description';
+  document.getElementById('detailLat').textContent = m.lat.toFixed(5);
+  document.getElementById('detailLon').textContent = m.lon.toFixed(5);
+
+  let url = state.mediaStore[m.id] || await loadMediaFromDB(m.id);
+  if (url) state.mediaStore[m.id]=url;
+
+  const mediaEl = document.getElementById('detailMedia');
+  if (m.type==='audio') {
+    const bars = Array.from({length:24},()=>`<div class="audio-bar" style="height:${4+Math.random()*40}px;opacity:${0.4+Math.random()*0.6}"></div>`).join('');
+    mediaEl.innerHTML=`<div class="audio-player"><div class="audio-wave-vis">${bars}</div><div class="audio-controls"><button class="btn-play-large" id="detailPlayBtn">▶</button><div class="audio-filename">${m.mediaName||'No file'}</div><div class="audio-time" id="detailAudioTime">0:00</div></div></div>`;
+    if (url) {
+      const audio=new Audio(url);
+      document.getElementById('detailPlayBtn').onclick=()=>{ if(audio.paused){audio.play();document.getElementById('detailPlayBtn').textContent='⏸';}else{audio.pause();document.getElementById('detailPlayBtn').textContent='▶';} };
+      audio.ontimeupdate=()=>{ const t=document.getElementById('detailAudioTime'); if(t)t.textContent=formatTime(audio.currentTime); };
+    }
+  } else if (m.type==='photo') {
+    mediaEl.innerHTML = url ? `<img class="photo-preview" src="${url}" alt="${m.title}">` : `<div class="scan3d-viewer"><div class="scan3d-icon">📷</div><div class="scan3d-name">No image stored</div></div>`;
+  } else {
+    mediaEl.innerHTML=`<div class="scan3d-viewer"><div class="scan3d-icon">🧊</div><div class="scan3d-name">${m.mediaName||'No file'}</div>${url?`<button class="btn-open-scan" style="margin-top:8px;padding:10px 20px;border-radius:8px;border:1px solid var(--accent);background:rgba(255,92,60,0.1);color:var(--accent);font-family:DM Mono,monospace;font-size:0.75rem;cursor:pointer;" onclick="downloadScan('${m.id}','${m.mediaName||'scan'}')">DOWNLOAD ↗</button>`:''}</div>`;
+  }
+
+  const btnPlayHere=document.getElementById('btnPlayHere');
+  btnPlayHere.className=`btn-play-here ${m.type==='audio'?'':m.type}`;
+  btnPlayHere.textContent=m.type==='audio'?'▶ PLAY AUDIO':m.type==='photo'?'🔍 VIEW FULLSCREEN':'🧊 DOWNLOAD SCAN';
+  btnPlayHere.onclick=()=>{ if(m.type==='audio'&&url){playAudio(m,url);panel.classList.remove('open');}else if(m.type==='photo'&&url){window.open(url,'_blank');}else if(m.type==='scan3d'&&url){downloadScan(m.id,m.mediaName);} };
+  document.getElementById('btnDeleteMarker').onclick=()=>deleteMarker(m.id);
+  panel.classList.add('open');
+}
+
+function downloadScan(id, name) {
+  const url=state.mediaStore[id]; if(!url)return;
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+}
+
+document.getElementById('btnCloseDetail').onclick=()=>document.getElementById('detailPanel').classList.remove('open');
+document.getElementById('detailPanel').addEventListener('click',e=>{ if(e.target===document.getElementById('detailPanel'))document.getElementById('detailPanel').classList.remove('open'); });
+
+// ═══════════════════════════════════════
+// AUDIO PLAYBACK
+// ═══════════════════════════════════════
+let currentAudioEl=null;
+function playAudio(marker,url) {
+  if(currentAudioEl){currentAudioEl.pause();currentAudioEl=null;}
+  if(state.currentAudio){const lm=state.leafletMarkers[state.currentAudio.id];if(lm)lm.setIcon(getMarkerIcon(state.currentAudio.type,state.currentAudio.title));}
+  const audio=new Audio(url); currentAudioEl=audio; state.currentAudio=marker; state.isPlaying=true;
+  const lm=state.leafletMarkers[marker.id]; if(lm)lm.setIcon(getMarkerIcon(marker.type,marker.title,true));
+  const np=document.getElementById('nowPlaying'); np.classList.remove('hidden');
+  document.getElementById('nowPlayingTitle').textContent=marker.title;
+  document.getElementById('nowPlayingMeta').textContent=`🎙 ${marker.mediaName||'audio'}`;
+  document.getElementById('waveform').classList.remove('paused');
+  document.getElementById('btnPlayPause').textContent='⏸';
+  audio.play();
+  audio.onended=()=>{ state.isPlaying=false; document.getElementById('waveform').classList.add('paused'); document.getElementById('btnPlayPause').textContent='▶'; if(lm)lm.setIcon(getMarkerIcon(marker.type,marker.title)); };
+}
+document.getElementById('btnPlayPause').onclick=()=>{ if(!currentAudioEl)return; if(currentAudioEl.paused){currentAudioEl.play();document.getElementById('waveform').classList.remove('paused');document.getElementById('btnPlayPause').textContent='⏸';}else{currentAudioEl.pause();document.getElementById('waveform').classList.add('paused');document.getElementById('btnPlayPause').textContent='▶';} };
+document.getElementById('btnStop').onclick=()=>{ if(currentAudioEl){currentAudioEl.pause();currentAudioEl=null;} state.isPlaying=false; document.getElementById('nowPlaying').classList.add('hidden'); if(state.currentAudio){const lm=state.leafletMarkers[state.currentAudio.id];if(lm)lm.setIcon(getMarkerIcon(state.currentAudio.type,state.currentAudio.title));} };
+
+// ═══════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════
+function deleteMarker(id) {
+  if(!confirm('Delete this marker?'))return;
+  state.markers=state.markers.filter(m=>m.id!==id);
+  state.experiences.forEach(e=>{e.markerIds=(e.markerIds||[]).filter(x=>x!==id);});
+  saveMarkers(); saveExperiences();
+  const lm=state.leafletMarkers[id]; if(lm){lm.remove();delete state.leafletMarkers[id];}
+  const pc=state.proximityCircles[id]; if(pc){pc.remove();delete state.proximityCircles[id];}
+  document.getElementById('detailPanel').classList.remove('open');
+  updateStats(); renderExpList();
+}
+function saveMarkers(){try{localStorage.setItem('fieldcast_markers',JSON.stringify(state.markers));}catch(e){}}
+function saveExperiences(){try{localStorage.setItem('fieldcast_experiences',JSON.stringify(state.experiences));}catch(e){}}
+function updateStats(){
+  document.getElementById('countAudio').textContent=state.markers.filter(m=>m.type==='audio').length;
+  document.getElementById('countPhoto').textContent=state.markers.filter(m=>m.type==='photo').length;
+  document.getElementById('count3d').textContent=state.markers.filter(m=>m.type==='scan3d').length;
+  document.getElementById('countExp').textContent=state.experiences.length;
+}
+function resetMarkerForm(){
+  document.getElementById('markerTitle').value='';
+  document.getElementById('markerDesc').value='';
+  document.getElementById('audioFile').value=''; document.getElementById('audioFileName').textContent='';
+  document.getElementById('photoFile').value=''; document.getElementById('photoFileName').textContent='';
+  document.getElementById('scanFile').value=''; document.getElementById('scanFileName').textContent='';
+  document.getElementById('triggerRadius').value=30; document.getElementById('radiusVal').textContent='30';
+  document.getElementById('recTimer').textContent='00:00'; document.getElementById('recStatus').textContent='Tap to record';
+  document.getElementById('photoDirection').value=''; state.recordingBlob=null;
+  document.querySelectorAll('.type-card').forEach(c=>c.classList.remove('selected','photo','scan3d'));
+  document.querySelector('[data-type=audio]').classList.add('selected');
+  state.markerType='audio';
+  document.getElementById('audioSection').style.display='';
+  document.getElementById('photoSection').style.display='none';
+  document.getElementById('scan3dSection').style.display='none';
+  document.getElementById('btnSubmitMarker').className='btn-submit';
+  if(state.userLat){state.pendingLat=state.userLat;state.pendingLon=state.userLon;}
+  updatePendingCoords();
+}
+function updatePendingCoords(){
+  document.getElementById('pendingLat').textContent=state.pendingLat?state.pendingLat.toFixed(5):'—';
+  document.getElementById('pendingLon').textContent=state.pendingLon?state.pendingLon.toFixed(5):'—';
+}
+function showToast(msg,type=''){
+  const t=document.getElementById('toast'); t.textContent=msg; t.className=`toast ${type} show`;
+  clearTimeout(showToast._t); showToast._t=setTimeout(()=>t.classList.remove('show'),2800);
+}
+function formatTime(s){const m=Math.floor(s/60);const sec=Math.floor(s%60).toString().padStart(2,'0');return`${m}:${sec}`;}
+
+// IndexedDB
+let _db=null;
+function openDB(){if(_db)return Promise.resolve(_db);return new Promise((res,rej)=>{const req=indexedDB.open('fieldcast',1);req.onupgradeneeded=e=>{e.target.result.createObjectStore('media');};req.onsuccess=e=>{_db=e.target.result;res(_db);};req.onerror=rej;});}
+async function saveMediaToDB(id,blob){try{const db=await openDB();const tx=db.transaction('media','readwrite');tx.objectStore('media').put(blob,id);}catch(e){}}
+async function loadMediaFromDB(id){try{const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('media','readonly');const req=tx.objectStore('media').get(id);req.onsuccess=()=>res(req.result?URL.createObjectURL(req.result):null);req.onerror=()=>res(null);});}catch(e){return null;}}
+
+document.getElementById('btnLocate').onclick=()=>{ if(state.userLat)map.setView([state.userLat,state.userLon],17,{animate:true}); else showToast('Location unavailable','error'); };
+
+// INIT
+(async()=>{for(const m of state.markers){const url=await loadMediaFromDB(m.id);if(url)state.mediaStore[m.id]=url;}renderAllMarkers();})();
+</script>
+</body>
+</html>
