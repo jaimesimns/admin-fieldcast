@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FIELDCAST — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --ink: #0a0a0f; --paper: #f0ede6; --signal: #e8ff3c; --signal2: #3cffe8;
+  --muted: #6b6860; --border: #2a2a35; --card: #13131e; --accent: #ff5c3c;
+  --exp: #b07cff; --ok: #4ddf8a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'DM Mono', monospace;
+  background: var(--ink);
+  color: var(--paper);
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* SETUP */
+.setup-overlay { position: fixed; inset: 0; background: var(--ink); z-index: 9000; display: flex; align-items: flex-start; justify-content: center; padding: 24px; overflow-y: auto; }
+.setup-overlay.hidden { display: none; }
+.setup-box { width: 100%; max-width: 460px; padding: 24px 0 60px; }
+.setup-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.8rem; color: var(--signal); letter-spacing: -0.03em; margin-bottom: 2px; }
+.setup-logo span { color: var(--paper); opacity: .35; font-weight: 400; }
+.setup-eyebrow { font-size: .63rem; letter-spacing: .14em; color: var(--muted); margin-bottom: 24px; }
+.setup-desc { font-size: .75rem; color: var(--muted); line-height: 1.7; margin-bottom: 18px; }
+.setup-step { display: flex; gap: 10px; align-items: flex-start; font-size: .72rem; color: var(--muted); line-height: 1.6; margin-bottom: 7px; }
+.step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center; font-size: .6rem; flex-shrink: 0; margin-top: 1px; }
+.sql-block { background: rgba(0,0,0,.45); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: .6rem; color: var(--muted); line-height: 1.75; white-space: pre-wrap; overflow-x: auto; margin: 10px 0 18px; }
+.sql-block b { color: var(--signal2); }
+.setup-input { display: block; width: 100%; background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; color: var(--paper); font-family: 'DM Mono', monospace; font-size: .8rem; outline: none; transition: border-color .2s; margin-bottom: 10px; }
+.setup-input:focus { border-color: var(--signal); }
+.setup-input::placeholder { color: var(--muted); }
+.btn-setup { display: block; width: 100%; padding: 13px; border-radius: 10px; border: none; background: var(--signal); color: var(--ink); font-family: 'Syne', sans-serif; font-weight: 700; font-size: .95rem; cursor: pointer; transition: all .15s; }
+.btn-setup:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(232,255,60,.3); }
+.setup-err { font-size: .7rem; color: var(--accent); padding: 8px 12px; border: 1px solid rgba(255,92,60,.3); border-radius: 6px; background: rgba(255,92,60,.06); margin-top: 10px; display: none; }
+.setup-err.show { display: block; }
+
+/* SUPABASE BAR */
+#sbBar { display: none; align-items: center; gap: 8px; padding: 5px 16px; background: rgba(77,223,138,.07); border-bottom: 1px solid rgba(77,223,138,.15); font-size: .63rem; color: var(--ok); letter-spacing: .06em; flex-shrink: 0; }
+#sbBar.on { display: flex; }
+.sb-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+#sbBar button { margin-left: auto; font-size: .6rem; color: var(--muted); background: none; border: none; cursor: pointer; font-family: 'DM Mono', monospace; }
+#sbBar button:hover { color: var(--accent); }
+
+/* HEADER */
+header { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: var(--ink); border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 12px; }
+.logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: -.03em; color: var(--signal); }
+.logo span { color: var(--paper); opacity: .4; font-weight: 400; }
+.logo sub { font-size: .48rem; color: var(--accent); letter-spacing: .1em; vertical-align: super; margin-left: 3px; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+
+/* MAP SEARCH IN HEADER */
+.map-search-header { flex: 1; max-width: 320px; position: relative; }
+.map-search-input-hdr { width: 100%; background: rgba(255,255,255,.07); border: 1px solid var(--border); border-radius: 7px; padding: 6px 11px; color: var(--paper); font-family: 'DM Mono', monospace; font-size: .72rem; outline: none; transition: border-color .2s; }
+.map-search-input-hdr:focus { border-color: var(--signal2); background: rgba(60,255,232,.05); }
+.map-search-input-hdr::placeholder { color: var(--muted); }
+.map-search-results-hdr { position: absolute; top: calc(100% + 5px); left: 0; right: 0; background: var(--card); border: 1px solid var(--border); border-radius: 9px; z-index: 5000; max-height: 260px; overflow-y: auto; display: none; box-shadow: 0 8px 32px rgba(0,0,0,.6); }
+.map-search-results-hdr.open { display: block; }
+.msr-item { padding: 9px 13px; font-size: .72rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,.04); line-height: 1.4; transition: background .15s; }
+.msr-item:last-child { border-bottom: none; }
+.msr-item:hover { background: rgba(60,255,232,.08); }
+.msr-name { font-size: .76rem; color: var(--paper); }
+.msr-sub { font-size: .6rem; color: var(--muted); margin-top: 2px; }
+.msr-loading { padding: 10px 13px; font-size: .68rem; color: var(--muted); }
+.tabs { display: flex; gap: 4px; }
+.tab { padding: 5px 13px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .62rem; letter-spacing: .06em; cursor: pointer; transition: all .2s; }
+.tab.on { background: var(--card); color: var(--paper); border-color: var(--signal); }
+.tab.exp.on { border-color: var(--exp); color: var(--exp); }
+
+/* MAIN AREA — fills remaining height */
+#main { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+
+/* MAP VIEW */
+#mapView { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#map { flex: 1; background: #0d0d18; }
+.leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.7); }
+
+/* MAP BOTTOM BAR */
+#mapBar { flex-shrink: 0; background: var(--ink); border-top: 1px solid var(--border); padding: 10px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
+.np-row { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; }
+.np-row.hidden { display: none; }
+.waveform { display: flex; align-items: center; gap: 2px; height: 22px; }
+.wb { width: 3px; background: var(--signal); border-radius: 2px; animation: wave 1.2s ease-in-out infinite; }
+.wb:nth-child(1){animation-delay:0s} .wb:nth-child(2){animation-delay:.1s} .wb:nth-child(3){animation-delay:.2s} .wb:nth-child(4){animation-delay:.3s} .wb:nth-child(5){animation-delay:.4s} .wb:nth-child(6){animation-delay:.2s} .wb:nth-child(7){animation-delay:.1s}
+@keyframes wave{0%,100%{height:4px}50%{height:18px}}
+.waveform.paused .wb { animation-play-state: paused; height: 4px; }
+.np-info { flex: 1; min-width: 0; }
+.np-title { font-family: 'Syne', sans-serif; font-size: .82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.np-meta { font-size: .6rem; color: var(--muted); margin-top: 1px; }
+.np-btns { display: flex; gap: 5px; }
+.np-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--signal); background: transparent; color: var(--signal); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .8rem; transition: all .15s; }
+.np-btn:hover { background: var(--signal); color: var(--ink); }
+.np-btn.stop { border-color: var(--border); color: var(--muted); }
+.np-btn.stop:hover { border-color: var(--accent); color: var(--accent); }
+.map-actions { display: flex; gap: 8px; }
+.btn-map-add { flex: 1; background: var(--signal); color: var(--ink); border: none; border-radius: 9px; padding: 11px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: .85rem; cursor: pointer; transition: all .15s; }
+.btn-map-add:hover { transform: translateY(-1px); box-shadow: 0 3px 14px rgba(232,255,60,.3); }
+.stats { display: flex; gap: 12px; flex-wrap: wrap; }
+.stat { display: flex; align-items: center; gap: 4px; font-size: .6rem; color: var(--muted); }
+.sd { width: 5px; height: 5px; border-radius: 50%; }
+.sd.a{background:var(--signal)} .sd.p{background:var(--signal2)} .sd.s{background:var(--accent)} .sd.e{background:var(--exp)} .sd.c{background:var(--ok)}
+.sn { color: var(--paper); }
+
+/* EXP VIEW */
+#expView { flex: 1; display: none; min-height: 0; }
+.exp-layout { display: grid; grid-template-columns: 240px 1fr; height: 100%; }
+@media(max-width:600px){ .exp-layout { grid-template-columns: 1fr; } .exp-editor { display: none; } .exp-editor.mobile-show { display: flex; } }
+
+/* Sidebar */
+.exp-sidebar { border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-head { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.sidebar-head-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: .88rem; }
+.btn-new { padding: 5px 11px; background: var(--exp); color: var(--ink); border: none; border-radius: 6px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: .68rem; cursor: pointer; white-space: nowrap; }
+.btn-new:hover { box-shadow: 0 2px 10px rgba(176,124,255,.4); }
+.sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
+.sidebar-list::-webkit-scrollbar { width: 3px; }
+.sidebar-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.exp-item { padding: 9px 11px; border-radius: 7px; border: 1px solid transparent; cursor: pointer; margin-bottom: 5px; transition: all .15s; }
+.exp-item:hover { background: rgba(255,255,255,.03); border-color: var(--border); }
+.exp-item.active { background: rgba(176,124,255,.08); border-color: var(--exp); }
+.ei-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: .82rem; margin-bottom: 2px; }
+.ei-meta { font-size: .58rem; color: var(--muted); }
+.ei-badge { display: inline-block; font-size: .52rem; padding: 1px 6px; border-radius: 8px; border: 1px solid; margin-top: 3px; }
+.ei-badge.published { border-color: var(--signal); color: var(--signal); }
+.ei-badge.draft { border-color: var(--border); color: var(--muted); }
+.sidebar-empty { padding: 28px 14px; text-align: center; font-size: .72rem; color: var(--muted); line-height: 1.7; }
+
+/* Editor */
+.exp-editor { display: flex; flex-direction: column; overflow: hidden; height: 100%; }
+.editor-blank { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; opacity: .3; }
+.editor-blank-icon { font-size: 2.8rem; }
+.editor-blank-text { font-size: .75rem; color: var(--muted); }
+.editor-body { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.editor-head { padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.ed-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.ed-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.05rem; flex: 1; background: transparent; border: none; color: var(--paper); outline: none; border-bottom: 1px solid transparent; padding-bottom: 2px; transition: border-color .2s; }
+.ed-title:focus { border-color: var(--exp); }
+.ed-title::placeholder { color: var(--muted); font-weight: 400; font-family: 'DM Mono', monospace; }
+.status-badge { font-size: .58rem; padding: 3px 8px; border-radius: 9px; border: 1px solid; flex-shrink: 0; }
+.status-badge.published { border-color: var(--signal); color: var(--signal); background: rgba(232,255,60,.07); }
+.status-badge.draft { border-color: var(--border); color: var(--muted); }
+.ed-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 7px; }
+.ed-input { width: 100%; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; color: var(--paper); font-family: 'DM Mono', monospace; font-size: .72rem; outline: none; transition: border-color .2s; }
+.ed-input:focus { border-color: var(--exp); }
+.ed-input::placeholder { color: var(--muted); }
+.ed-desc { grid-column: 1 / -1; }
+.ed-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ed-btn { padding: 6px 13px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .62rem; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.ed-btn.save { border-color: rgba(176,124,255,.5); color: var(--exp); }
+.ed-btn.save:hover { background: rgba(176,124,255,.1); }
+.ed-btn.publish { border-color: rgba(232,255,60,.4); color: var(--signal); }
+.ed-btn.publish:hover { background: rgba(232,255,60,.07); }
+.ed-btn.export { border-color: rgba(77,223,138,.4); color: var(--ok); }
+.ed-btn.export:hover { background: rgba(77,223,138,.07); }
+.ed-btn.del { border-color: rgba(255,92,60,.3); color: var(--accent); }
+.ed-btn.del:hover { background: rgba(255,92,60,.07); }
+
+/* Item list inside editor */
+.item-list-area { flex: 1; overflow-y: auto; padding: 14px 18px; }
+.item-list-area::-webkit-scrollbar { width: 3px; }
+.item-list-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.item-list-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.item-count-label { font-size: .6rem; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.btn-add-item { padding: 5px 12px; background: var(--signal); color: var(--ink); border: none; border-radius: 6px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: .65rem; cursor: pointer; transition: all .15s; }
+.btn-add-item:hover { box-shadow: 0 2px 10px rgba(232,255,60,.3); }
+.item-list { display: flex; flex-direction: column; gap: 7px; }
+.item-row { display: flex; align-items: center; gap: 9px; padding: 11px 13px; background: var(--card); border: 1px solid var(--border); border-radius: 9px; }
+.item-ord-btns { display: flex; flex-direction: column; gap: 2px; }
+.ord-btn { width: 20px; height: 17px; border-radius: 3px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: .52rem; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.ord-btn:hover:not(:disabled) { border-color: var(--exp); color: var(--exp); }
+.ord-btn:disabled { opacity: .2; cursor: not-allowed; }
+.item-num { width: 21px; height: 21px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center; font-size: .6rem; flex-shrink: 0; color: var(--muted); }
+.item-icon { font-size: 1.1rem; flex-shrink: 0; }
+.item-info { flex: 1; min-width: 0; }
+.item-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-meta { font-size: .58rem; color: var(--muted); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
+.tag { padding: 1px 5px; border-radius: 3px; border: 1px solid; font-size: .53rem; }
+.tag.cloud { border-color: rgba(77,223,138,.3); color: var(--ok); }
+.tag.loc { border-color: rgba(60,255,232,.3); color: var(--signal2); }
+.item-btns { display: flex; gap: 5px; flex-shrink: 0; }
+.btn-edit { width: 25px; height: 25px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .68rem; transition: all .15s; }
+.btn-edit:hover { border-color: var(--signal2); color: var(--signal2); }
+.btn-remove { width: 25px; height: 25px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .68rem; flex-shrink: 0; transition: all .15s; }
+.btn-remove:hover { border-color: var(--accent); color: var(--accent); }
+.item-empty { text-align: center; padding: 36px 20px; font-size: .73rem; color: var(--muted); line-height: 1.7; }
+/* Edit mode modal tweaks */
+.type-card.locked { opacity: .45; pointer-events: none; }
+.existing-media { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; font-size: .68rem; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.existing-media a { color: var(--signal2); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.existing-media a:hover { text-decoration: underline; }
+.replace-label { font-size: .58rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; display: block; margin-top: 6px; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 20px 20px 0 0; width: 100%; max-width: 580px; padding: 18px 22px 40px; transform: translateY(100%); transition: transform .35s cubic-bezier(.34,1.1,.64,1); max-height: 92dvh; overflow-y: auto; }
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal::-webkit-scrollbar { width: 3px; }
+.modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.mhandle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+.mtitle { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.15rem; margin-bottom: 3px; }
+.msub { font-size: .66rem; color: var(--muted); letter-spacing: .05em; margin-bottom: 16px; }
+.type-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-bottom: 16px; }
+.type-card { border: 1px solid var(--border); border-radius: 9px; padding: 12px 8px; text-align: center; cursor: pointer; transition: all .2s; background: rgba(255,255,255,.03); }
+.type-card.sel { border-color: var(--signal); background: rgba(232,255,60,.08); }
+.type-card.sel.photo { border-color: var(--signal2); background: rgba(60,255,232,.06); }
+.type-card.sel.scan3d { border-color: var(--accent); background: rgba(255,92,60,.06); }
+.tc-icon { font-size: 1.4rem; margin-bottom: 4px; }
+.tc-lbl { font-size: .6rem; letter-spacing: .06em; color: var(--muted); }
+.type-card.sel .tc-lbl { color: var(--paper); }
+.fg { margin-bottom: 12px; }
+.fl { display: block; font-size: .6rem; letter-spacing: .08em; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; }
+.fi { width: 100%; background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 7px; padding: 9px 12px; color: var(--paper); font-family: 'DM Mono', monospace; font-size: .82rem; outline: none; transition: border-color .2s; }
+.fi:focus { border-color: var(--signal); }
+.fi::placeholder { color: var(--muted); }
+textarea.fi { resize: vertical; min-height: 64px; line-height: 1.5; }
+select.fi { cursor: pointer; }
+.file-drop { border: 1px dashed var(--border); border-radius: 9px; padding: 18px; text-align: center; position: relative; cursor: pointer; transition: all .2s; }
+.file-drop:hover { border-color: var(--signal); background: rgba(232,255,60,.03); }
+.file-drop input[type=file] { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.fd-icon { font-size: 1.5rem; margin-bottom: 5px; }
+.fd-txt { font-size: .66rem; color: var(--muted); }
+.fd-name { font-size: .7rem; color: var(--signal); margin-top: 4px; }
+
+/* GPS section in modal */
+.gps-box { background: rgba(60,255,232,.04); border: 1px solid rgba(60,255,232,.15); border-radius: 8px; padding: 12px 13px; margin-bottom: 12px; }
+.gps-box-label { font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; color: var(--signal2); margin-bottom: 10px; }
+.loc-search-wrap { position: relative; margin-bottom: 8px; }
+.loc-search-input { padding-left: 12px; }
+.loc-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; z-index: 3000; max-height: 200px; overflow-y: auto; display: none; }
+.loc-results.open { display: block; }
+.loc-result-item { padding: 9px 12px; font-size: .72rem; cursor: pointer; border-bottom: 1px solid var(--border); line-height: 1.4; }
+.loc-result-item:last-child { border-bottom: none; }
+.loc-result-item:hover { background: rgba(60,255,232,.08); color: var(--signal2); }
+.loc-result-name { font-size: .74rem; color: var(--paper); }
+.loc-result-sub { font-size: .62rem; color: var(--muted); margin-top: 1px; }
+.loc-loading { padding: 10px 12px; font-size: .68rem; color: var(--muted); }
+.coord-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.coord-field { display: flex; flex-direction: column; gap: 4px; }
+.coord-confirmed { background: rgba(60,255,232,.08); border: 1px solid rgba(60,255,232,.25); border-radius: 6px; padding: 6px 10px; font-size: .68rem; color: var(--signal2); margin-bottom: 7px; }
+.btn-gps { width: 100%; padding: 7px; background: rgba(60,255,232,.08); border: 1px solid rgba(60,255,232,.25); border-radius: 6px; color: var(--signal2); font-family: 'DM Mono', monospace; font-size: .66rem; cursor: pointer; transition: all .15s; }
+.btn-gps:hover { background: rgba(60,255,232,.14); }
+.radius-row { display: flex; align-items: center; gap: 9px; margin-top: 8px; }
+.radius-label { font-size: .62rem; color: var(--muted); white-space: nowrap; }
+input[type=range] { -webkit-appearance: none; flex: 1; height: 3px; background: var(--border); border-radius: 2px; outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--signal2); cursor: pointer; }
+.radius-val { font-size: .68rem; color: var(--signal2); width: 36px; text-align: right; }
+
+/* Recording */
+.rec-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.btn-rec { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); background: rgba(255,92,60,.07); color: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; transition: all .15s; }
+.btn-rec.on { background: var(--accent); color: #fff; animation: blink 1s infinite; }
+.rec-timer { font-size: .76rem; color: var(--muted); }
+.rec-timer.on { color: var(--accent); }
+.rec-status { font-size: .66rem; color: var(--muted); }
+
+/* Upload progress */
+.up-prog { display: none; background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; margin-top: 9px; }
+.up-prog.show { display: block; }
+.up-prog-top { display: flex; justify-content: space-between; font-size: .6rem; color: var(--muted); margin-bottom: 6px; }
+.up-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.up-fill { height: 100%; background: var(--ok); border-radius: 2px; transition: width .3s; width: 0%; }
+.up-status { font-size: .62rem; color: var(--ok); margin-top: 5px; display: none; }
+.up-status.show { display: block; }
+.up-status.err { color: var(--accent); }
+
+.btn-submit { display: block; width: 100%; margin-top: 13px; padding: 13px; border-radius: 10px; border: none; background: var(--signal); color: var(--ink); font-family: 'Syne', sans-serif; font-weight: 700; font-size: .92rem; cursor: pointer; transition: all .15s; }
+.btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(232,255,60,.3); }
+.btn-submit:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-submit.photo { background: var(--signal2); }
+.btn-submit.scan3d { background: var(--accent); color: #fff; }
+.btn-cancel { display: block; width: 100%; margin-top: 7px; padding: 9px; background: transparent; border: none; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .76rem; cursor: pointer; }
+
+/* Map markers */
+.mk { position: relative; cursor: pointer; }
+.mk-lbl { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); background: rgba(10,10,15,.9); border: 1px solid var(--border); border-radius: 5px; padding: 2px 7px; font-size: .56rem; white-space: nowrap; color: var(--paper); pointer-events: none; }
+.mk-ring { width: 38px; height: 38px; border-radius: 50%; border: 2px solid; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); animation: pop .3s cubic-bezier(.34,1.56,.64,1); }
+.mk-ring.audio { border-color: var(--signal); background: rgba(232,255,60,.1); }
+.mk-ring.photo { border-color: var(--signal2); background: rgba(60,255,232,.1); }
+.mk-ring.scan3d { border-color: var(--accent); background: rgba(255,92,60,.1); }
+.mk-ring.playing { animation: pulse2 2s infinite; }
+@keyframes pop { from{transform:scale(0) translateY(8px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
+@keyframes pulse2 { 0%,100%{box-shadow:0 0 0 3px rgba(232,255,60,.2)} 50%{box-shadow:0 0 0 9px rgba(232,255,60,.04)} }
+
+/* Toast */
+.toast { position: fixed; top: 62px; left: 50%; transform: translateX(-50%) translateY(-14px); background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: 8px 16px; font-size: .72rem; color: var(--paper); z-index: 9999; opacity: 0; transition: all .3s; pointer-events: none; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.ok { border-color: var(--ok); }
+.toast.err { border-color: var(--accent); }
+.toast.cloud { border-color: var(--ok); }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-box">
+    <div class="setup-logo">FIELD<span>CAST</span></div>
+    <div class="setup-eyebrow">ADMIN · SUPABASE SETUP</div>
+    <div class="setup-desc">Connect to Supabase to store your markers, experiences, and media files in the cloud.</div>
+    <div class="setup-step"><div class="step-num">1</div><div>Create a free project at <strong>supabase.com</strong></div></div>
+    <div class="setup-step"><div class="step-num">2</div><div>Go to <strong>Storage → New Bucket</strong>, name it <code>fieldcast-media</code>, set to <strong>Public</strong></div></div>
+    <div class="setup-step"><div class="step-num">3</div><div>In <strong>SQL Editor</strong>, paste and run this schema:</div></div>
+    <div class="sql-block"><b>create table</b> markers (
+  id text primary key, title text not null, description text,
+  type text not null, lat float8, lon float8, radius int4 default 30,
+  media_url text, media_name text, direction text, scan_type text,
+  created_at timestamptz default now()
+);
+<b>create table</b> experiences (
+  id text primary key, title text not null, tagline text,
+  description text, cover_url text, duration text,
+  status text default 'draft', marker_ids text[] default '{}',
+  created_at timestamptz default now(), updated_at timestamptz default now()
+);
+<b>alter table</b> markers <b>enable row level security</b>;
+<b>alter table</b> experiences <b>enable row level security</b>;
+<b>create policy</b> "Public read" <b>on</b> markers <b>for select using</b> (true);
+<b>create policy</b> "Public read" <b>on</b> experiences <b>for select using</b> (true);
+<b>create policy</b> "Anon write" <b>on</b> markers <b>for all using</b> (true);
+<b>create policy</b> "Anon write" <b>on</b> experiences <b>for all using</b> (true);</div>
+    <div class="setup-step"><div class="step-num">4</div><div>Copy your <strong>Project URL</strong> and <strong>anon/public key</strong> from <strong>Settings → API</strong></div></div>
+    <div class="setup-err" id="setupErr"></div>
+    <input class="setup-input" id="inUrl" type="url" placeholder="https://xxxx.supabase.co" autocomplete="off">
+    <input class="setup-input" id="inKey" type="text" placeholder="anon public key (eyJ...)" autocomplete="off">
+    <button class="btn-setup" id="btnConnect">Connect &amp; Continue →</button>
+  </div>
+</div>
+
+<!-- SUPABASE BAR -->
+<div id="sbBar">
+  <div class="sb-dot"></div>
+  <span id="sbLabel">Connected</span>
+  <button onclick="disconnectSB()">disconnect</button>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">FIELD<span>CAST</span><sub>ADMIN</sub></div>
+  <div class="map-search-header" id="mapSearchHeader">
+    <input class="map-search-input-hdr" id="mapSearchHdr" type="text" placeholder="🔍 Search map..." autocomplete="off">
+    <div class="map-search-results-hdr" id="mapSearchResultsHdr"></div>
+  </div>
+  <div class="tabs">
+    <button class="tab on" id="tabMap" onclick="switchTab('map')">MAP</button>
+    <button class="tab exp" id="tabExp" onclick="switchTab('exp')">EXPERIENCES</button>
+  </div>
+</header>
+
+<!-- MAIN AREA -->
+<div id="main">
+
+  <!-- MAP VIEW -->
+  <div id="mapView">
+    <div id="map"></div>
+    <div id="mapBar">
+      <div class="np-row hidden" id="npRow">
+        <div class="waveform" id="waveform">
+          <div class="wb" style="height:8px"></div><div class="wb" style="height:13px"></div><div class="wb" style="height:18px"></div><div class="wb" style="height:10px"></div><div class="wb" style="height:20px"></div><div class="wb" style="height:12px"></div><div class="wb" style="height:6px"></div>
+        </div>
+        <div class="np-info"><div class="np-title" id="npTitle">—</div><div class="np-meta" id="npMeta">—</div></div>
+        <div class="np-btns">
+          <button class="np-btn" id="btnPP">▶</button>
+          <button class="np-btn stop" id="btnStop">■</button>
+        </div>
+      </div>
+      <div class="map-actions">
+        <button class="btn-map-add" id="btnMapAdd">+ ADD ITEM</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="sd a"></div><span class="sn" id="cA">0</span> audio</div>
+        <div class="stat"><div class="sd p"></div><span class="sn" id="cP">0</span> photo</div>
+        <div class="stat"><div class="sd s"></div><span class="sn" id="cS">0</span> 3D</div>
+        <div class="stat"><div class="sd e"></div><span class="sn" id="cE">0</span> exp</div>
+        <div class="stat"><div class="sd c"></div><span class="sn" id="cC">0</span> ☁</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPERIENCES VIEW -->
+  <div id="expView">
+    <div class="exp-layout">
+
+      <!-- Sidebar -->
+      <div class="exp-sidebar">
+        <div class="sidebar-head">
+          <div class="sidebar-head-title">Experiences</div>
+          <button class="btn-new" onclick="newExp()">+ New</button>
+        </div>
+        <div class="sidebar-list" id="sidebarList">
+          <div class="sidebar-empty">No experiences yet.<br>Click + New to start.</div>
+        </div>
+      </div>
+
+      <!-- Editor panel -->
+      <div class="exp-editor" id="expEditor">
+        <!-- Blank state -->
+        <div class="editor-blank" id="edBlank">
+          <div class="editor-blank-icon">🎧</div>
+          <div class="editor-blank-text">Select or create an experience</div>
+        </div>
+        <!-- Editor body — shown when an experience is selected -->
+        <div class="editor-body" id="edBody" style="display:none">
+          <div class="editor-head">
+            <div class="ed-title-row">
+              <input class="ed-title" id="edTitle" placeholder="Experience title..." maxlength="80">
+              <span class="status-badge draft" id="edBadge">DRAFT</span>
+            </div>
+            <div class="ed-meta-grid">
+              <input class="ed-input" id="edTagline" placeholder="Tagline...">
+              <input class="ed-input" id="edDuration" placeholder="Duration, e.g. 45 min">
+              <input class="ed-input ed-desc" id="edDesc" placeholder="Description for visitors...">
+              <input class="ed-input" id="edCover" placeholder="Cover image URL (optional)">
+            </div>
+            <div class="ed-actions">
+              <button class="ed-btn save" onclick="saveExp()">☁ SAVE</button>
+              <button class="ed-btn publish" id="btnPublish" onclick="togglePublish()">PUBLISH</button>
+              <button class="ed-btn export" onclick="exportExp()">↓ EXPORT JSON</button>
+              <button class="ed-btn del" onclick="deleteExp()">DELETE</button>
+            </div>
+          </div>
+          <div class="item-list-area">
+            <div class="item-list-top">
+              <span class="item-count-label" id="itemCount">0 items</span>
+              <button class="btn-add-item" onclick="openModal()">+ Add item</button>
+            </div>
+            <div class="item-list" id="itemList">
+              <div class="item-empty">No items yet. Click + Add item to begin.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- end #main -->
+
+<!-- ADD ITEM MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="mhandle"></div>
+    <div class="mtitle" id="modalTitle">Add Item</div>
+    <div class="msub" id="modalSub">CHOOSE TYPE · UPLOAD MEDIA · SET LOCATION</div>
+    <div class="type-grid">
+      <div class="type-card sel" data-t="audio"><div class="tc-icon">🎙</div><div class="tc-lbl">AUDIO</div></div>
+      <div class="type-card" data-t="photo"><div class="tc-icon">📷</div><div class="tc-lbl">PHOTO</div></div>
+      <div class="type-card" data-t="scan3d"><div class="tc-icon">🧊</div><div class="tc-lbl">3D SCAN</div></div>
+    </div>
+    <div class="fg"><label class="fl">TITLE</label><input class="fi" id="mTitle" type="text" placeholder="Name this stop..."></div>
+    <div class="fg"><label class="fl">DESCRIPTION</label><textarea class="fi" id="mDesc" placeholder="What should visitors know here?"></textarea></div>
+
+    <div id="secAudio">
+      <div class="fg">
+        <div class="existing-media" id="existingAudio" style="display:none">🎵 Current: <a id="existingAudioLink" href="#" target="_blank">file</a></div>
+        <label class="fl replace-label" id="audioFileLabel">AUDIO FILE</label>
+        <div class="file-drop"><input type="file" id="fAudio" accept="audio/*"><div class="fd-icon">🎵</div><div class="fd-txt">DROP OR BROWSE</div><div class="fd-name" id="nAudio"></div></div>
+      </div>
+      <div class="fg"><label class="fl">— OR RECORD —</label>
+        <div class="rec-row">
+          <button class="btn-rec" id="btnRec">⏺</button>
+          <div><div class="rec-timer" id="recTimer">00:00</div><div class="rec-status" id="recStatus">Tap to record</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="secPhoto" style="display:none">
+      <div class="fg">
+        <div class="existing-media" id="existingPhoto" style="display:none">📷 Current: <a id="existingPhotoLink" href="#" target="_blank">image</a></div>
+        <label class="replace-label fl" id="photoFileLabel">PHOTO</label>
+        <div class="file-drop"><input type="file" id="fPhoto" accept="image/*" capture="environment"><div class="fd-icon">📸</div><div class="fd-txt">TAKE PHOTO OR BROWSE</div><div class="fd-name" id="nPhoto"></div></div>
+      </div>
+      <div class="fg"><label class="fl">COMPASS DIRECTION (optional)</label><input class="fi" id="fDir" type="number" placeholder="0–360°" min="0" max="360"></div>
+    </div>
+
+    <div id="secScan" style="display:none">
+      <div class="fg">
+        <div class="existing-media" id="existingScan" style="display:none">🧊 Current: <a id="existingScanLink" href="#" target="_blank">file</a></div>
+        <label class="replace-label fl" id="scanFileLabel">3D SCAN FILE</label>
+        <div class="file-drop"><input type="file" id="fScan" accept=".glb,.gltf,.obj,.ply,.usdz,.splat"><div class="fd-icon">🧊</div><div class="fd-txt">UPLOAD SCAN FILE (.glb, .ply, .obj...)</div><div class="fd-name" id="nScan"></div></div>
+      </div>
+      <div class="fg"><label class="fl">SCAN TYPE</label>
+        <select class="fi" id="fScanType">
+          <option value="photogrammetry">Photogrammetry (.glb/.obj)</option>
+          <option value="lidar">LiDAR (.ply)</option>
+          <option value="gaussian">Gaussian Splat (.splat)</option>
+          <option value="usdz">USDZ (Apple AR)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="gps-box">
+      <div class="gps-box-label">📍 Location — for proximity trigger</div>
+
+      <!-- Place name -->
+      <div class="fg" style="margin-bottom:8px">
+        <label class="fl">PLACE NAME (optional label)</label>
+        <input class="fi" id="fPlaceName" placeholder="e.g. Old Market Square" style="font-size:.78rem;">
+      </div>
+
+      <!-- Search -->
+      <div class="loc-search-wrap">
+        <input class="fi loc-search-input" id="locSearch" type="text" placeholder="🔍  Search for a place..." autocomplete="off">
+        <div class="loc-results" id="locResults"></div>
+      </div>
+
+      <!-- Manual lat/lon -->
+      <div class="coord-inputs">
+        <div class="coord-field">
+          <label class="fl">LATITUDE</label>
+          <input class="fi" id="fLat" type="number" step="any" placeholder="51.5074" oninput="onManualCoord()">
+        </div>
+        <div class="coord-field">
+          <label class="fl">LONGITUDE</label>
+          <input class="fi" id="fLon" type="number" step="any" placeholder="-0.1278" oninput="onManualCoord()">
+        </div>
+      </div>
+
+      <!-- Confirmed display + GPS button -->
+      <div class="coord-confirmed" id="coordConfirmed" style="display:none">
+        <span id="coordDisplay">—</span>
+      </div>
+      <button class="btn-gps" id="btnUseGPS" style="display:none">📡 Use my current GPS position</button>
+      <div style="font-size:.58rem;color:var(--muted);margin-top:5px">Or tap the map to pin a location while this modal is open. You can also search or enter coordinates manually.</div>
+
+      <div class="radius-row">
+        <span class="radius-label">Trigger radius:</span>
+        <input type="range" id="fRadius" min="5" max="200" value="30" oninput="document.getElementById('rVal').textContent=this.value+'m'">
+        <span class="radius-val" id="rVal">30m</span>
+      </div>
+    </div>
+
+    <div class="up-prog" id="upProg">
+      <div class="up-prog-top"><span>Uploading to Supabase Storage...</span><span id="upPct">0%</span></div>
+      <div class="up-bar"><div class="up-fill" id="upFill"></div></div>
+    </div>
+    <div class="up-status" id="upStatus"></div>
+
+    <button class="btn-submit" id="btnSubmit">ADD TO EXPERIENCE</button>
+    <button class="btn-cancel" onclick="closeModal()">cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════
+// SUPABASE INIT — hardcoded credentials
+// ══════════════════════════════════════
+const { createClient } = supabase;
+const BUCKET = 'fieldcast-media';
+const SB_URL = 'https://gplxpnijrfnskakujtiu.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwbHhwbmlqcmZuc2tha3VqdGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTkwNDcsImV4cCI6MjA4ODc5NTA0N30.nb24yCoTjhVBiifnkmZUOIYjkn3Xk4dqKyHPXtEBO5o';
+const sb = createClient(SB_URL, SB_KEY);
+
+// Share with visitor.html on same device
+localStorage.setItem('fc_url', SB_URL);
+localStorage.setItem('fc_key', SB_KEY);
+
+// Skip setup screen entirely — boot straight into the app
+document.getElementById('setupOverlay').classList.add('hidden');
+document.getElementById('sbBar').classList.add('on');
+document.getElementById('sbLabel').textContent = '☁ gplxpnijrfnskakujtiu.supabase.co';
+function disconnectSB() { toast('Credentials are hardcoded in this build', 'err'); }
+
+// Kick off once DOM is ready
+window.addEventListener('DOMContentLoaded', () => {
+  switchTab('map');
+  init();
+});
+
+// ══════════════════════════════════════
+// STATE
+// ══════════════════════════════════════
+const S = {
+  markers: [], experiences: [],
+  userLat: null, userLon: null,
+  pendingLat: null, pendingLon: null,
+  itemType: 'audio',
+  recordingBlob: null, recording: false,
+  recorder: null, recChunks: [], recInterval: null, recSeconds: 0,
+  leafletMarkers: {}, circles: {}, userMarker: null,
+  currentExpId: null,
+  curAudio: null, curAudioEl: null,
+  editingMarkerId: null,   // null = add mode, string = edit mode
+};
+
+// ══════════════════════════════════════
+// INIT
+// ══════════════════════════════════════
+let map;
+async function init() {
+  initMap();
+  const [mr, er] = await Promise.all([
+    sb.from('markers').select('*').order('created_at', { ascending: true }),
+    sb.from('experiences').select('*').order('created_at', { ascending: true }),
+  ]);
+  if (!mr.error) S.markers = mr.data || [];
+  if (!er.error) S.experiences = er.data || [];
+  renderMapMarkers();
+  renderSidebar();
+  // Auto-select first experience if any exist
+  if (S.experiences.length && !S.currentExpId) {
+    S.currentExpId = S.experiences[0].id;
+    renderSidebar();
+    renderEditor();
+    // Fly map to first marker of first experience
+    const firstExp = S.experiences[0];
+    const firstMId = (firstExp.marker_ids || [])[0];
+    const firstM = firstMId ? S.markers.find(m => m.id === firstMId) : null;
+    if (firstM && firstM.lat) map.setView([firstM.lat, firstM.lon], 15);
+  } else if (S.markers.length) {
+    // Fit all markers
+    const geo = S.markers.filter(m => m.lat && m.lon);
+    if (geo.length > 1) {
+      const lats = geo.map(m => m.lat), lons = geo.map(m => m.lon);
+      map.fitBounds([[Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]], { padding: [40,40] });
+    } else if (geo.length === 1) {
+      map.setView([geo[0].lat, geo[0].lon], 15);
+    }
+  }
+  updateStats();
+  toast(`☁ Loaded ${S.experiences.length} exp, ${S.markers.length} items`, 'ok');
+}
+
+// ══════════════════════════════════════
+// MAP
+// ══════════════════════════════════════
+function initMap() {
+  map = L.map('map', { center: [51.505, -0.09], zoom: 15, zoomControl: false, attributionControl: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  L.control.zoom({ position: 'topright' }).addTo(map);
+  map.on('click', e => {
+    if (document.getElementById('modal').classList.contains('open')) {
+      setCoords(e.latlng.lat, e.latlng.lng);
+      toast('📍 Location pinned from map');
+    }
+  });
+}
+
+const ICONS = { audio: '🎙', photo: '📷', scan3d: '🧊' };
+
+function mkLeafletIcon(m, playing = false) {
+  return L.divIcon({ className: '', html: `<div class="mk"><div class="mk-lbl">${m.title}</div><div class="mk-ring ${m.type}${playing ? ' playing' : ''}"><span style="font-size:.95rem">${ICONS[m.type] || '📍'}</span></div></div>`, iconSize: [38, 38], iconAnchor: [19, 19] });
+}
+
+function renderMapMarkers() {
+  Object.values(S.leafletMarkers).forEach(l => l.remove());
+  Object.values(S.circles).forEach(c => c.remove());
+  S.leafletMarkers = {}; S.circles = {};
+  S.markers.forEach(m => addLeafletMarker(m));
+  updateStats();
+}
+
+function addLeafletMarker(m) {
+  const lm = L.marker([m.lat, m.lon], { icon: mkLeafletIcon(m) }).addTo(map)
+    .on('click', () => { if (m.type === 'audio' && m.media_url) playAudio(m); else toast(ICONS[m.type] + ' ' + m.title); });
+  S.leafletMarkers[m.id] = lm;
+  const col = m.type === 'audio' ? '#e8ff3c' : m.type === 'photo' ? '#3cffe8' : '#ff5c3c';
+  S.circles[m.id] = L.circle([m.lat, m.lon], { radius: m.radius || 30, color: col, fillColor: col, fillOpacity: .05, weight: 1, dashArray: '4 4' }).addTo(map);
+}
+
+// ══════════════════════════════════════
+// TABS
+// ══════════════════════════════════════
+function switchTab(t) {
+  document.getElementById('tabMap').classList.toggle('on', t === 'map');
+  document.getElementById('tabExp').classList.toggle('on', t === 'exp');
+  document.getElementById('mapView').style.display = t === 'map' ? 'flex' : 'none';
+  document.getElementById('expView').style.display = t === 'exp' ? 'flex' : 'none';
+  if (t === 'map') setTimeout(() => map.invalidateSize(), 60);
+}
+
+// ══════════════════════════════════════
+// EXPERIENCE SIDEBAR
+// ══════════════════════════════════════
+function renderSidebar() {
+  const el = document.getElementById('sidebarList');
+  if (!S.experiences.length) {
+    el.innerHTML = '<div class="sidebar-empty">No experiences yet.<br>Click + New to start.</div>';
+    updateStats(); return;
+  }
+  el.innerHTML = S.experiences.map(exp => {
+    const n = (exp.marker_ids || []).length;
+    return `<div class="exp-item${S.currentExpId === exp.id ? ' active' : ''}" onclick="selectExp('${exp.id}')">
+      <div class="ei-title">${exp.title || 'Untitled'}</div>
+      <div class="ei-meta">${n} item${n !== 1 ? 's' : ''}</div>
+      <div class="ei-badge ${exp.status || 'draft'}">${(exp.status || 'draft').toUpperCase()}</div>
+    </div>`;
+  }).join('');
+  updateStats();
+}
+
+function selectExp(id) {
+  S.currentExpId = id;
+  renderSidebar();
+  renderEditor();
+}
+
+// ══════════════════════════════════════
+// EXPERIENCE EDITOR
+// ══════════════════════════════════════
+function renderEditor() {
+  const exp = S.experiences.find(e => e.id === S.currentExpId);
+  const blank = document.getElementById('edBlank');
+  const body = document.getElementById('edBody');
+  if (!exp) { blank.style.display = 'flex'; body.style.display = 'none'; return; }
+  blank.style.display = 'none';
+  body.style.display = 'flex';
+  document.getElementById('edTitle').value = exp.title || '';
+  document.getElementById('edTagline').value = exp.tagline || '';
+  document.getElementById('edDuration').value = exp.duration || '';
+  document.getElementById('edDesc').value = exp.description || '';
+  document.getElementById('edCover').value = exp.cover_url || '';
+  const badge = document.getElementById('edBadge');
+  badge.textContent = (exp.status || 'draft').toUpperCase();
+  badge.className = 'status-badge ' + (exp.status === 'published' ? 'published' : 'draft');
+  document.getElementById('btnPublish').textContent = exp.status === 'published' ? 'UNPUBLISH' : 'PUBLISH';
+  renderItemList(exp);
+}
+
+function renderItemList(exp) {
+  const ids = exp.marker_ids || [];
+  document.getElementById('itemCount').textContent = ids.length + ' item' + (ids.length !== 1 ? 's' : '');
+  const list = document.getElementById('itemList');
+  if (!ids.length) { list.innerHTML = '<div class="item-empty">No items yet. Click + Add item to begin.</div>'; return; }
+  const items = ids.map(id => S.markers.find(m => m.id === id)).filter(Boolean);
+  list.innerHTML = items.map((m, i) => `
+    <div class="item-row">
+      <div class="item-ord-btns">
+        <button class="ord-btn" onclick="moveItem('${m.id}', -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button class="ord-btn" onclick="moveItem('${m.id}', 1)" ${i === items.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>
+      <div class="item-num">${i + 1}</div>
+      <div class="item-icon">${ICONS[m.type] || '📍'}</div>
+      <div class="item-info">
+        <div class="item-title">${m.title}</div>
+        <div class="item-meta">
+          <span>${m.type.toUpperCase()}</span>
+          ${m.media_url ? '<span class="tag cloud">☁ cloud</span>' : ''}
+          ${m.lat ? `<span class="tag loc">📍 ${m.lat.toFixed(3)}, ${m.lon.toFixed(3)}</span>` : ''}
+        </div>
+      </div>
+      <div class="item-btns">
+        <button class="btn-edit" onclick="openEditModal('${m.id}')" title="Edit item">✎</button>
+        <button class="btn-remove" onclick="removeItem('${m.id}')" title="Remove from experience">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+async function moveItem(markerId, dir) {
+  const exp = S.experiences.find(e => e.id === S.currentExpId); if (!exp) return;
+  const ids = [...(exp.marker_ids || [])];
+  const i = ids.indexOf(markerId); const j = i + dir;
+  if (j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  exp.marker_ids = ids;
+  await sb.from('experiences').update({ marker_ids: ids, updated_at: new Date().toISOString() }).eq('id', exp.id);
+  renderItemList(exp);
+}
+
+async function removeItem(markerId) {
+  const exp = S.experiences.find(e => e.id === S.currentExpId); if (!exp) return;
+  exp.marker_ids = (exp.marker_ids || []).filter(x => x !== markerId);
+  await sb.from('experiences').update({ marker_ids: exp.marker_ids, updated_at: new Date().toISOString() }).eq('id', exp.id);
+  renderItemList(exp);
+  toast('Item removed');
+}
+
+function newExp() {
+  const exp = { id: 'e' + Date.now(), title: '', tagline: '', description: '', cover_url: '', duration: '', status: 'draft', marker_ids: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  S.experiences.unshift(exp);
+  S.currentExpId = exp.id;
+  renderSidebar();
+  renderEditor();
+  setTimeout(() => document.getElementById('edTitle').focus(), 60);
+}
+
+async function saveExp() {
+  const exp = S.experiences.find(e => e.id === S.currentExpId); if (!exp) return;
+  exp.title = document.getElementById('edTitle').value.trim() || 'Untitled';
+  exp.tagline = document.getElementById('edTagline').value.trim();
+  exp.duration = document.getElementById('edDuration').value.trim();
+  exp.description = document.getElementById('edDesc').value.trim();
+  exp.cover_url = document.getElementById('edCover').value.trim();
+  exp.updated_at = new Date().toISOString();
+  const { error } = await sb.from('experiences').upsert(exp);
+  if (!error) { renderSidebar(); renderEditor(); toast('☁ Saved', 'ok'); }
+  else toast('Save failed: ' + error.message, 'err');
+}
+
+async function togglePublish() {
+  const exp = S.experiences.find(e => e.id === S.currentExpId); if (!exp) return;
+  exp.status = exp.status === 'published' ? 'draft' : 'published';
+  exp.updated_at = new Date().toISOString();
+  await sb.from('experiences').update({ status: exp.status, updated_at: exp.updated_at }).eq('id', exp.id);
+  renderSidebar(); renderEditor();
+  toast(exp.status === 'published' ? '✓ Published' : 'Set to draft');
+}
+
+async function deleteExp() {
+  if (!confirm('Delete this experience? Items will not be deleted.')) return;
+  await sb.from('experiences').delete().eq('id', S.currentExpId);
+  S.experiences = S.experiences.filter(e => e.id !== S.currentExpId);
+  S.currentExpId = null;
+  renderSidebar(); renderEditor();
+}
+
+function exportExp() {
+  const exp = S.experiences.find(e => e.id === S.currentExpId); if (!exp) return;
+  const items = (exp.marker_ids || []).map(id => S.markers.find(m => m.id === id)).filter(Boolean).map((m, i) => ({
+    order: i + 1, id: m.id, title: m.title, description: m.description || '',
+    type: m.type, lat: m.lat, lon: m.lon, radius: m.radius || 30,
+    media_url: m.media_url || null, media_name: m.media_name || null,
+    direction: m.direction || null, scan_type: m.scan_type || null,
+  }));
+  const payload = {
+    fieldcast_version: 1,
+    exported: new Date().toISOString(),
+    experience: { id: exp.id, title: exp.title, tagline: exp.tagline || '', description: exp.description || '', cover_url: exp.cover_url || '', duration: exp.duration || '', status: exp.status },
+    items,
+  };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+  a.download = (exp.title || 'experience').toLowerCase().replace(/\s+/g, '-') + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('↓ Exported', 'ok');
+}
+
+// ══════════════════════════════════════
+// ADD ITEM MODAL
+// ══════════════════════════════════════
+function openModal() {
+  if (!S.currentExpId) { toast('Select or create an experience first', 'err'); return; }
+  S.editingMarkerId = null;
+  resetForm();
+  document.getElementById('modalTitle').textContent = 'Add Item';
+  document.getElementById('modalSub').textContent = 'CHOOSE TYPE · UPLOAD MEDIA · SET LOCATION';
+  document.getElementById('btnSubmit').textContent = 'ADD TO EXPERIENCE';
+  document.getElementById('btnSubmit').className = 'btn-submit';
+  // Unlock type cards
+  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('locked'));
+  document.getElementById('modal').classList.add('open');
+}
+
+function openEditModal(markerId) {
+  const m = S.markers.find(x => x.id === markerId);
+  if (!m) return;
+  S.editingMarkerId = markerId;
+  resetForm();
+
+  // Modal header
+  document.getElementById('modalTitle').textContent = 'Edit Item';
+  document.getElementById('modalSub').textContent = 'UPDATE DETAILS · REPLACE MEDIA · MOVE LOCATION';
+
+  // Lock type cards (type can't change after creation)
+  document.querySelectorAll('.type-card').forEach(c => {
+    c.classList.remove('sel', 'photo', 'scan3d', 'locked');
+    if (c.dataset.t === m.type) c.classList.add('sel', m.type);
+    else c.classList.add('locked');
+  });
+  S.itemType = m.type;
+  document.getElementById('secAudio').style.display = m.type === 'audio' ? '' : 'none';
+  document.getElementById('secPhoto').style.display = m.type === 'photo' ? '' : 'none';
+  document.getElementById('secScan').style.display = m.type === 'scan3d' ? '' : 'none';
+
+  // Pre-fill text fields
+  document.getElementById('mTitle').value = m.title || '';
+  document.getElementById('mDesc').value = m.description || '';
+
+  // Show existing media
+  if (m.media_url) {
+    const fname = m.media_name || m.media_url.split('/').pop();
+    if (m.type === 'audio') {
+      document.getElementById('existingAudio').style.display = 'flex';
+      const link = document.getElementById('existingAudioLink');
+      link.href = m.media_url; link.textContent = fname;
+      document.getElementById('audioFileLabel').textContent = 'REPLACE AUDIO FILE (optional)';
+    } else if (m.type === 'photo') {
+      document.getElementById('existingPhoto').style.display = 'flex';
+      const link = document.getElementById('existingPhotoLink');
+      link.href = m.media_url; link.textContent = fname;
+      document.getElementById('photoFileLabel').textContent = 'REPLACE PHOTO (optional)';
+    } else if (m.type === 'scan3d') {
+      document.getElementById('existingScan').style.display = 'flex';
+      const link = document.getElementById('existingScanLink');
+      link.href = m.media_url; link.textContent = fname;
+      document.getElementById('scanFileLabel').textContent = 'REPLACE SCAN FILE (optional)';
+    }
+  }
+
+  // Pre-fill type-specific fields
+  if (m.type === 'photo' && m.direction) document.getElementById('fDir').value = m.direction;
+  if (m.type === 'scan3d' && m.scan_type) document.getElementById('fScanType').value = m.scan_type;
+
+  // Pre-fill location
+  if (m.lat != null && m.lon != null) {
+    setCoords(m.lat, m.lon);
+    // Fly map to current marker position
+    map.setView([m.lat, m.lon], Math.max(map.getZoom(), 15), { animate: true });
+  }
+
+  // Radius
+  const r = m.radius || 30;
+  document.getElementById('fRadius').value = r;
+  document.getElementById('rVal').textContent = r + 'm';
+
+  // Submit button
+  const btn = document.getElementById('btnSubmit');
+  btn.textContent = 'SAVE CHANGES';
+  btn.className = 'btn-submit' + (m.type === 'audio' ? '' : ' ' + m.type);
+
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  S.editingMarkerId = null;
+  stopRecording();
+  document.getElementById('upProg').classList.remove('show');
+  document.getElementById('upStatus').classList.remove('show');
+}
+document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
+
+// Map tab add button — switch to exp tab if no exp selected, else open modal
+document.getElementById('btnMapAdd').onclick = () => {
+  if (S.currentExpId) { openModal(); }
+  else { switchTab('exp'); toast('Select or create an experience, then add items', 'ok'); }
+};
+
+// Type selector
+document.querySelectorAll('.type-card').forEach(card => {
+  card.onclick = () => {
+    document.querySelectorAll('.type-card').forEach(c => c.classList.remove('sel', 'photo', 'scan3d'));
+    card.classList.add('sel', card.dataset.t);
+    S.itemType = card.dataset.t;
+    document.getElementById('secAudio').style.display = S.itemType === 'audio' ? '' : 'none';
+    document.getElementById('secPhoto').style.display = S.itemType === 'photo' ? '' : 'none';
+    document.getElementById('secScan').style.display = S.itemType === 'scan3d' ? '' : 'none';
+    const btn = document.getElementById('btnSubmit');
+    btn.className = 'btn-submit' + (S.itemType === 'audio' ? '' : ' ' + S.itemType);
+  };
+});
+
+document.getElementById('fAudio').onchange = e => { const f = e.target.files[0]; if (f) document.getElementById('nAudio').textContent = f.name; };
+document.getElementById('fPhoto').onchange = e => { const f = e.target.files[0]; if (f) document.getElementById('nPhoto').textContent = f.name; };
+document.getElementById('fScan').onchange = e => { const f = e.target.files[0]; if (f) document.getElementById('nScan').textContent = f.name; };
+
+document.getElementById('btnUseGPS').onclick = () => {
+  if (S.userLat != null) { setCoords(S.userLat, S.userLon); toast('📡 GPS position used'); }
+  else toast('No GPS signal yet', 'err');
+};
+
+// Recording
+document.getElementById('btnRec').onclick = async () => {
+  if (S.recording) { stopRecording(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    S.recChunks = []; S.recorder = new MediaRecorder(stream);
+    S.recorder.ondataavailable = e => S.recChunks.push(e.data);
+    S.recorder.onstop = () => {
+      S.recordingBlob = new Blob(S.recChunks, { type: 'audio/webm' });
+      document.getElementById('recStatus').textContent = 'Recording saved ✓';
+      document.getElementById('nAudio').textContent = 'rec_' + Date.now() + '.webm';
+    };
+    S.recorder.start(); S.recording = true; S.recSeconds = 0;
+    document.getElementById('btnRec').classList.add('on');
+    document.getElementById('recStatus').textContent = 'Recording...';
+    S.recInterval = setInterval(() => {
+      S.recSeconds++;
+      const m = Math.floor(S.recSeconds / 60).toString().padStart(2, '0');
+      const s = (S.recSeconds % 60).toString().padStart(2, '0');
+      document.getElementById('recTimer').textContent = m + ':' + s;
+      document.getElementById('recTimer').classList.add('on');
+    }, 1000);
+  } catch(e) { toast('Microphone access denied', 'err'); }
+};
+
+function stopRecording() {
+  if (S.recorder && S.recording) { S.recorder.stop(); S.recorder.stream?.getTracks().forEach(t => t.stop()); }
+  S.recording = false; clearInterval(S.recInterval);
+  document.getElementById('btnRec').classList.remove('on');
+  document.getElementById('recTimer').classList.remove('on');
+}
+
+// Upload
+async function uploadMedia(file, id) {
+  const ext = (file.name || 'file').split('.').pop() || 'bin';
+  const path = id + '.' + ext;
+  document.getElementById('upProg').classList.add('show');
+  let pct = 0;
+  const tick = setInterval(() => { pct = Math.min(pct + 7, 88); setUpPct(pct); }, 200);
+  const { error } = await sb.storage.from(BUCKET).upload(path, file, { cacheControl: '31536000', upsert: true, contentType: file.type || 'application/octet-stream' });
+  clearInterval(tick); setUpPct(100);
+  setTimeout(() => document.getElementById('upProg').classList.remove('show'), 600);
+  if (error) { setUpStatus('Upload failed: ' + error.message, true); return null; }
+  const { data: { publicUrl } } = sb.storage.from(BUCKET).getPublicUrl(path);
+  setUpStatus('☁ Uploaded to Supabase Storage', false);
+  return publicUrl;
+}
+function setUpPct(p) { document.getElementById('upFill').style.width = p + '%'; document.getElementById('upPct').textContent = p + '%'; }
+function setUpStatus(msg, isErr) {
+  const el = document.getElementById('upStatus');
+  el.textContent = msg; el.className = 'up-status show' + (isErr ? ' err' : '');
+  if (!isErr) setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// Submit — handles both ADD and EDIT modes
+document.getElementById('btnSubmit').onclick = async () => {
+  const btn = document.getElementById('btnSubmit');
+  const title = document.getElementById('mTitle').value.trim() || document.getElementById('fPlaceName').value.trim() || 'Untitled';
+  const desc = document.getElementById('mDesc').value.trim();
+  const radius = parseInt(document.getElementById('fRadius').value) || 30;
+  const latInput = parseFloat(document.getElementById('fLat').value);
+  const lonInput = parseFloat(document.getElementById('fLon').value);
+  const lat = !isNaN(latInput) ? latInput : (S.pendingLat != null ? S.pendingLat : map.getCenter().lat);
+  const lon = !isNaN(lonInput) ? lonInput : (S.pendingLon != null ? S.pendingLon : map.getCenter().lng);
+
+  // ── EDIT MODE ──────────────────────────────────────
+  if (S.editingMarkerId) {
+    const m = S.markers.find(x => x.id === S.editingMarkerId);
+    if (!m) return;
+    btn.disabled = true; btn.textContent = 'SAVING...';
+
+    // Collect new file (if any)
+    let file = null;
+    if (m.type === 'audio') {
+      file = document.getElementById('fAudio').files[0] || null;
+      if (!file && S.recordingBlob) file = new File([S.recordingBlob], 'rec_' + Date.now() + '.webm', { type: 'audio/webm' });
+    } else if (m.type === 'photo') {
+      file = document.getElementById('fPhoto').files[0] || null;
+    } else if (m.type === 'scan3d') {
+      file = document.getElementById('fScan').files[0] || null;
+    }
+
+    // Upload new media if provided
+    if (file) {
+      btn.textContent = 'UPLOADING MEDIA...';
+      const url = await uploadMedia(file, m.id);
+      if (url) { m.media_url = url; m.media_name = file.name; }
+    }
+
+    // Update fields
+    m.title = title;
+    m.description = desc;
+    m.lat = lat;
+    m.lon = lon;
+    m.radius = radius;
+    if (m.type === 'photo') m.direction = document.getElementById('fDir').value || null;
+    if (m.type === 'scan3d') m.scan_type = document.getElementById('fScanType').value;
+
+    btn.textContent = 'SAVING...';
+    const { error } = await sb.from('markers').update({
+      title: m.title, description: m.description,
+      lat: m.lat, lon: m.lon, radius: m.radius,
+      media_url: m.media_url, media_name: m.media_name,
+      direction: m.direction, scan_type: m.scan_type,
+    }).eq('id', m.id);
+
+    btn.disabled = false; btn.textContent = 'SAVE CHANGES';
+    if (error) { toast('Update failed: ' + error.message, 'err'); return; }
+
+    // Refresh map marker + circle at new coords
+    if (S.leafletMarkers[m.id]) { S.leafletMarkers[m.id].remove(); delete S.leafletMarkers[m.id]; }
+    if (S.circles[m.id]) { S.circles[m.id].remove(); delete S.circles[m.id]; }
+    addLeafletMarker(m);
+
+    // Fly map to updated location
+    map.setView([m.lat, m.lon], Math.max(map.getZoom(), 16), { animate: true });
+
+    S.recordingBlob = null;
+    const exp = S.experiences.find(e => e.id === S.currentExpId);
+    if (exp) renderItemList(exp);
+    closeModal();
+    toast('✓ Item updated', 'ok');
+    return;
+  }
+
+  // ── ADD MODE ───────────────────────────────────────
+  const id = 'm' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  const marker = { id, title, description: desc, type: S.itemType, lat, lon, radius, created_at: new Date().toISOString(), media_url: null, media_name: null, direction: null, scan_type: null };
+  btn.disabled = true; btn.textContent = 'UPLOADING...';
+  let file = null;
+  if (S.itemType === 'audio') { file = document.getElementById('fAudio').files[0] || null; if (!file && S.recordingBlob) file = new File([S.recordingBlob], 'rec_' + Date.now() + '.webm', { type: 'audio/webm' }); }
+  else if (S.itemType === 'photo') { file = document.getElementById('fPhoto').files[0] || null; marker.direction = document.getElementById('fDir').value || null; }
+  else if (S.itemType === 'scan3d') { file = document.getElementById('fScan').files[0] || null; marker.scan_type = document.getElementById('fScanType').value; }
+  if (file) { marker.media_name = file.name; btn.textContent = 'UPLOADING MEDIA...'; const url = await uploadMedia(file, id); if (url) marker.media_url = url; }
+  btn.textContent = 'SAVING...';
+  const { error } = await sb.from('markers').insert(marker);
+  if (error) { btn.disabled = false; btn.textContent = 'ADD TO EXPERIENCE'; toast('DB error: ' + error.message, 'err'); return; }
+  S.markers.push(marker);
+  addLeafletMarker(marker);
+  // Add to current experience
+  const exp = S.experiences.find(e => e.id === S.currentExpId);
+  if (exp) {
+    exp.marker_ids = [...(exp.marker_ids || []), marker.id];
+    exp.updated_at = new Date().toISOString();
+    await sb.from('experiences').update({ marker_ids: exp.marker_ids, updated_at: exp.updated_at }).eq('id', exp.id);
+  }
+  btn.disabled = false; btn.textContent = 'ADD TO EXPERIENCE';
+  S.recordingBlob = null;
+  updateStats(); renderItemList(exp); closeModal();
+  toast(marker.media_url ? '☁ Item added to experience' : '✓ Item added', 'cloud');
+  map.setView([marker.lat, marker.lon], Math.max(map.getZoom(), 16));
+};
+
+// ══════════════════════════════════════
+// AUDIO PLAYBACK
+// ══════════════════════════════════════
+function playAudio(m) {
+  if (!m.media_url) { toast('No audio file', 'err'); return; }
+  if (S.curAudioEl) { S.curAudioEl.pause(); }
+  if (S.curAudio) { const lm = S.leafletMarkers[S.curAudio.id]; if (lm) lm.setIcon(mkLeafletIcon(S.curAudio)); }
+  const a = new Audio(m.media_url); S.curAudioEl = a; S.curAudio = m;
+  const lm = S.leafletMarkers[m.id]; if (lm) lm.setIcon(mkLeafletIcon(m, true));
+  document.getElementById('npRow').classList.remove('hidden');
+  document.getElementById('npTitle').textContent = m.title;
+  document.getElementById('npMeta').textContent = '🎙 ' + (m.media_name || 'audio');
+  document.getElementById('waveform').classList.remove('paused');
+  document.getElementById('btnPP').textContent = '⏸';
+  a.play();
+  a.onended = () => { document.getElementById('waveform').classList.add('paused'); document.getElementById('btnPP').textContent = '▶'; if (lm) lm.setIcon(mkLeafletIcon(m)); };
+}
+document.getElementById('btnPP').onclick = () => {
+  if (!S.curAudioEl) return;
+  if (S.curAudioEl.paused) { S.curAudioEl.play(); document.getElementById('waveform').classList.remove('paused'); document.getElementById('btnPP').textContent = '⏸'; }
+  else { S.curAudioEl.pause(); document.getElementById('waveform').classList.add('paused'); document.getElementById('btnPP').textContent = '▶'; }
+};
+document.getElementById('btnStop').onclick = () => {
+  if (S.curAudioEl) { S.curAudioEl.pause(); S.curAudioEl = null; }
+  document.getElementById('npRow').classList.add('hidden');
+  if (S.curAudio) { const lm = S.leafletMarkers[S.curAudio.id]; if (lm) lm.setIcon(mkLeafletIcon(S.curAudio)); }
+};
+
+// ══════════════════════════════════════
+// AUTO-SAVE (debounced, fires 800ms after last keystroke)
+// ══════════════════════════════════════
+let autoSaveTimer = null;
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(async () => {
+    const exp = S.experiences.find(e => e.id === S.currentExpId); if (!exp) return;
+    exp.title = document.getElementById('edTitle').value.trim() || 'Untitled';
+    exp.tagline = document.getElementById('edTagline').value.trim();
+    exp.duration = document.getElementById('edDuration').value.trim();
+    exp.description = document.getElementById('edDesc').value.trim();
+    exp.cover_url = document.getElementById('edCover').value.trim();
+    exp.updated_at = new Date().toISOString();
+    const { error } = await sb.from('experiences').upsert(exp);
+    if (!error) {
+      renderSidebar();
+      // Show subtle autosave indicator
+      const badge = document.getElementById('edBadge');
+      const prev = badge.textContent;
+      badge.textContent = '✓ SAVED';
+      setTimeout(() => { badge.textContent = prev; }, 1400);
+    }
+  }, 800);
+}
+
+// Wire auto-save to all editor inputs
+['edTitle','edTagline','edDuration','edDesc','edCover'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', scheduleAutoSave);
+});
+
+// ══════════════════════════════════════
+// MAP HEADER SEARCH
+// ══════════════════════════════════════
+let mapSearchTimer = null;
+const mapSearchInput = document.getElementById('mapSearchHdr');
+const mapSearchResults = document.getElementById('mapSearchResultsHdr');
+
+mapSearchInput.addEventListener('input', e => {
+  clearTimeout(mapSearchTimer);
+  const q = e.target.value.trim();
+  if (q.length < 3) { mapSearchResults.classList.remove('open'); return; }
+  mapSearchTimer = setTimeout(() => doMapSearch(q), 400);
+});
+
+mapSearchInput.addEventListener('blur', () => {
+  setTimeout(() => mapSearchResults.classList.remove('open'), 200);
+});
+
+mapSearchInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { mapSearchResults.classList.remove('open'); mapSearchInput.blur(); }
+});
+
+async function doMapSearch(q) {
+  mapSearchResults.innerHTML = '<div class="msr-loading">Searching...</div>';
+  mapSearchResults.classList.add('open');
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6`, { headers: { 'Accept-Language': 'en' } });
+    const data = await r.json();
+    if (!data.length) { mapSearchResults.innerHTML = '<div class="msr-loading">No results found</div>'; return; }
+    mapSearchResults.innerHTML = data.map(d => `
+      <div class="msr-item" onclick="flyToMapResult(${d.lat}, ${d.lon}, '${d.display_name.replace(/'/g,"\\'")}')">
+        <div class="msr-name">${d.display_name.split(',')[0]}</div>
+        <div class="msr-sub">${d.display_name.split(',').slice(1,3).join(',').trim()}</div>
+      </div>`).join('');
+  } catch(e) {
+    mapSearchResults.innerHTML = '<div class="msr-loading">Search failed</div>';
+  }
+}
+
+function flyToMapResult(lat, lon, name) {
+  map.setView([parseFloat(lat), parseFloat(lon)], 16, { animate: true });
+  mapSearchInput.value = name.split(',')[0];
+  mapSearchResults.classList.remove('open');
+  toast('🗺 ' + name.split(',')[0]);
+  // Switch to map tab if not already there
+  if (document.getElementById('mapView').style.display === 'none') switchTab('map');
+}
+
+
+// ══════════════════════════════════════
+let searchTimer = null;
+document.getElementById('locSearch').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (q.length < 3) { closeLocResults(); return; }
+  searchTimer = setTimeout(() => searchLocation(q), 420);
+});
+document.getElementById('locSearch').addEventListener('blur', () => {
+  setTimeout(closeLocResults, 200);
+});
+
+async function searchLocation(q) {
+  const res = document.getElementById('locResults');
+  res.innerHTML = '<div class="loc-loading">Searching...</div>';
+  res.classList.add('open');
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6`, { headers: { 'Accept-Language': 'en' } });
+    const data = await r.json();
+    if (!data.length) { res.innerHTML = '<div class="loc-loading">No results found</div>'; return; }
+    res.innerHTML = data.map(d => `
+      <div class="loc-result-item" onclick="pickLocation(${d.lat}, ${d.lon}, '${d.display_name.replace(/'/g,"\\'")}')">
+        <div class="loc-result-name">${d.display_name.split(',')[0]}</div>
+        <div class="loc-result-sub">${d.display_name.split(',').slice(1,3).join(',').trim()}</div>
+      </div>`).join('');
+  } catch(e) {
+    res.innerHTML = '<div class="loc-loading">Search failed</div>';
+  }
+}
+
+function pickLocation(lat, lon, name) {
+  setCoords(parseFloat(lat), parseFloat(lon));
+  document.getElementById('locSearch').value = name.split(',')[0];
+  if (!document.getElementById('fPlaceName').value) {
+    document.getElementById('fPlaceName').value = name.split(',')[0];
+  }
+  closeLocResults();
+  toast('📍 Location set: ' + name.split(',')[0]);
+  // Fly map to location
+  if (map) map.setView([parseFloat(lat), parseFloat(lon)], 16, { animate: true });
+}
+
+function closeLocResults() {
+  document.getElementById('locResults').classList.remove('open');
+}
+
+function onManualCoord() {
+  const lat = parseFloat(document.getElementById('fLat').value);
+  const lon = parseFloat(document.getElementById('fLon').value);
+  if (!isNaN(lat) && !isNaN(lon)) setCoords(lat, lon);
+}
+
+function setCoords(lat, lon) {
+  S.pendingLat = lat;
+  S.pendingLon = lon;
+  document.getElementById('fLat').value = lat.toFixed(6);
+  document.getElementById('fLon').value = lon.toFixed(6);
+  document.getElementById('coordConfirmed').style.display = 'block';
+  document.getElementById('coordDisplay').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+}
+
+function updateCoords() {
+  if (S.pendingLat != null) {
+    setCoords(S.pendingLat, S.pendingLon);
+  }
+}
+
+function resetForm() {
+  document.getElementById('mTitle').value = '';
+  document.getElementById('mDesc').value = '';
+  document.getElementById('fPlaceName').value = '';
+  document.getElementById('locSearch').value = '';
+  document.getElementById('fLat').value = '';
+  document.getElementById('fLon').value = '';
+  document.getElementById('coordConfirmed').style.display = 'none';
+  closeLocResults();
+  ['fAudio','fPhoto','fScan'].forEach(id => document.getElementById(id).value = '');
+  ['nAudio','nPhoto','nScan'].forEach(id => document.getElementById(id).textContent = '');
+  // Hide existing-media panels
+  ['existingAudio','existingPhoto','existingScan'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('audioFileLabel').textContent = 'AUDIO FILE';
+  document.getElementById('photoFileLabel').textContent = 'PHOTO';
+  document.getElementById('scanFileLabel').textContent = '3D SCAN FILE';
+  document.getElementById('fRadius').value = 30; document.getElementById('rVal').textContent = '30m';
+  document.getElementById('recTimer').textContent = '00:00'; document.getElementById('recTimer').classList.remove('on');
+  document.getElementById('recStatus').textContent = 'Tap to record';
+  document.getElementById('fDir').value = ''; S.recordingBlob = null;
+  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('sel', 'photo', 'scan3d', 'locked'));
+  document.querySelector('[data-t=audio]').classList.add('sel'); S.itemType = 'audio';
+  document.getElementById('secAudio').style.display = '';
+  document.getElementById('secPhoto').style.display = 'none';
+  document.getElementById('secScan').style.display = 'none';
+  document.getElementById('btnSubmit').className = 'btn-submit';
+  document.getElementById('btnSubmit').textContent = 'ADD TO EXPERIENCE';
+  // No GPS pre-fill — user sets location via search or map tap
+  S.pendingLat = null; S.pendingLon = null;
+}
+function updateStats() {
+  document.getElementById('cA').textContent = S.markers.filter(m => m.type === 'audio').length;
+  document.getElementById('cP').textContent = S.markers.filter(m => m.type === 'photo').length;
+  document.getElementById('cS').textContent = S.markers.filter(m => m.type === 'scan3d').length;
+  document.getElementById('cE').textContent = S.experiences.length;
+  document.getElementById('cC').textContent = S.markers.filter(m => m.media_url).length;
+}
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast ' + type + ' show';
+  clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
