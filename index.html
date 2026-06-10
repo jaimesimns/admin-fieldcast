@@ -58,21 +58,11 @@ header { display: flex; align-items: center; justify-content: space-between; pad
 .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: -.03em; color: var(--signal); }
 .logo span { color: var(--paper); opacity: .4; font-weight: 400; }
 .logo sub { font-size: .48rem; color: var(--accent); letter-spacing: .1em; vertical-align: super; margin-left: 3px; }
+.gps-pill { display: flex; align-items: center; gap: 5px; font-size: .6rem; color: var(--muted); }
+.gps-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.gps-dot.active { background: var(--signal); animation: blink 2s infinite; }
+.gps-dot.searching { background: #ffaa00; animation: blink 1s infinite; }
 @keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
-
-/* MAP SEARCH IN HEADER */
-.map-search-header { flex: 1; max-width: 320px; position: relative; }
-.map-search-input-hdr { width: 100%; background: rgba(255,255,255,.07); border: 1px solid var(--border); border-radius: 7px; padding: 6px 11px; color: var(--paper); font-family: 'DM Mono', monospace; font-size: .72rem; outline: none; transition: border-color .2s; }
-.map-search-input-hdr:focus { border-color: var(--signal2); background: rgba(60,255,232,.05); }
-.map-search-input-hdr::placeholder { color: var(--muted); }
-.map-search-results-hdr { position: absolute; top: calc(100% + 5px); left: 0; right: 0; background: var(--card); border: 1px solid var(--border); border-radius: 9px; z-index: 5000; max-height: 260px; overflow-y: auto; display: none; box-shadow: 0 8px 32px rgba(0,0,0,.6); }
-.map-search-results-hdr.open { display: block; }
-.msr-item { padding: 9px 13px; font-size: .72rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,.04); line-height: 1.4; transition: background .15s; }
-.msr-item:last-child { border-bottom: none; }
-.msr-item:hover { background: rgba(60,255,232,.08); }
-.msr-name { font-size: .76rem; color: var(--paper); }
-.msr-sub { font-size: .6rem; color: var(--muted); margin-top: 2px; }
-.msr-loading { padding: 10px 13px; font-size: .68rem; color: var(--muted); }
 .tabs { display: flex; gap: 4px; }
 .tab { padding: 5px 13px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'DM Mono', monospace; font-size: .62rem; letter-spacing: .06em; cursor: pointer; transition: all .2s; }
 .tab.on { background: var(--card); color: var(--paper); border-color: var(--signal); }
@@ -106,6 +96,8 @@ header { display: flex; align-items: center; justify-content: space-between; pad
 .map-actions { display: flex; gap: 8px; }
 .btn-map-add { flex: 1; background: var(--signal); color: var(--ink); border: none; border-radius: 9px; padding: 11px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: .85rem; cursor: pointer; transition: all .15s; }
 .btn-map-add:hover { transform: translateY(-1px); box-shadow: 0 3px 14px rgba(232,255,60,.3); }
+.btn-locate { width: 44px; background: var(--card); border: 1px solid var(--border); border-radius: 9px; color: var(--paper); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all .15s; flex-shrink: 0; }
+.btn-locate:hover { border-color: var(--signal2); color: var(--signal2); }
 .stats { display: flex; gap: 12px; flex-wrap: wrap; }
 .stat { display: flex; align-items: center; gap: 4px; font-size: .6rem; color: var(--muted); }
 .sd { width: 5px; height: 5px; border-radius: 50%; }
@@ -188,18 +180,9 @@ header { display: flex; align-items: center; justify-content: space-between; pad
 .tag { padding: 1px 5px; border-radius: 3px; border: 1px solid; font-size: .53rem; }
 .tag.cloud { border-color: rgba(77,223,138,.3); color: var(--ok); }
 .tag.loc { border-color: rgba(60,255,232,.3); color: var(--signal2); }
-.item-btns { display: flex; gap: 5px; flex-shrink: 0; }
-.btn-edit { width: 25px; height: 25px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .68rem; transition: all .15s; }
-.btn-edit:hover { border-color: var(--signal2); color: var(--signal2); }
 .btn-remove { width: 25px; height: 25px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .68rem; flex-shrink: 0; transition: all .15s; }
 .btn-remove:hover { border-color: var(--accent); color: var(--accent); }
 .item-empty { text-align: center; padding: 36px 20px; font-size: .73rem; color: var(--muted); line-height: 1.7; }
-/* Edit mode modal tweaks */
-.type-card.locked { opacity: .45; pointer-events: none; }
-.existing-media { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; font-size: .68rem; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-.existing-media a { color: var(--signal2); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.existing-media a:hover { text-decoration: underline; }
-.replace-label { font-size: .58rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; display: block; margin-top: 6px; }
 
 /* MODAL */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .25s; }
@@ -348,10 +331,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px;
 <!-- HEADER -->
 <header>
   <div class="logo">FIELD<span>CAST</span><sub>ADMIN</sub></div>
-  <div class="map-search-header" id="mapSearchHeader">
-    <input class="map-search-input-hdr" id="mapSearchHdr" type="text" placeholder="🔍 Search map..." autocomplete="off">
-    <div class="map-search-results-hdr" id="mapSearchResultsHdr"></div>
-  </div>
+  <div class="gps-pill"><div class="gps-dot" id="gpsDot"></div><span id="gpsText">LOCATING</span></div>
   <div class="tabs">
     <button class="tab on" id="tabMap" onclick="switchTab('map')">MAP</button>
     <button class="tab exp" id="tabExp" onclick="switchTab('exp')">EXPERIENCES</button>
@@ -377,6 +357,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px;
       </div>
       <div class="map-actions">
         <button class="btn-map-add" id="btnMapAdd">+ ADD ITEM</button>
+        <button class="btn-locate" id="btnLocate">⌖</button>
       </div>
       <div class="stats">
         <div class="stat"><div class="sd a"></div><span class="sn" id="cA">0</span> audio</div>
@@ -451,8 +432,8 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px;
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div class="mhandle"></div>
-    <div class="mtitle" id="modalTitle">Add Item</div>
-    <div class="msub" id="modalSub">CHOOSE TYPE · UPLOAD MEDIA · SET LOCATION</div>
+    <div class="mtitle">Add Item</div>
+    <div class="msub">CHOOSE TYPE · UPLOAD MEDIA · SET GPS LOCATION</div>
     <div class="type-grid">
       <div class="type-card sel" data-t="audio"><div class="tc-icon">🎙</div><div class="tc-lbl">AUDIO</div></div>
       <div class="type-card" data-t="photo"><div class="tc-icon">📷</div><div class="tc-lbl">PHOTO</div></div>
@@ -462,9 +443,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px;
     <div class="fg"><label class="fl">DESCRIPTION</label><textarea class="fi" id="mDesc" placeholder="What should visitors know here?"></textarea></div>
 
     <div id="secAudio">
-      <div class="fg">
-        <div class="existing-media" id="existingAudio" style="display:none">🎵 Current: <a id="existingAudioLink" href="#" target="_blank">file</a></div>
-        <label class="fl replace-label" id="audioFileLabel">AUDIO FILE</label>
+      <div class="fg"><label class="fl">AUDIO FILE</label>
         <div class="file-drop"><input type="file" id="fAudio" accept="audio/*"><div class="fd-icon">🎵</div><div class="fd-txt">DROP OR BROWSE</div><div class="fd-name" id="nAudio"></div></div>
       </div>
       <div class="fg"><label class="fl">— OR RECORD —</label>
@@ -476,18 +455,14 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px;
     </div>
 
     <div id="secPhoto" style="display:none">
-      <div class="fg">
-        <div class="existing-media" id="existingPhoto" style="display:none">📷 Current: <a id="existingPhotoLink" href="#" target="_blank">image</a></div>
-        <label class="replace-label fl" id="photoFileLabel">PHOTO</label>
+      <div class="fg"><label class="fl">PHOTO</label>
         <div class="file-drop"><input type="file" id="fPhoto" accept="image/*" capture="environment"><div class="fd-icon">📸</div><div class="fd-txt">TAKE PHOTO OR BROWSE</div><div class="fd-name" id="nPhoto"></div></div>
       </div>
       <div class="fg"><label class="fl">COMPASS DIRECTION (optional)</label><input class="fi" id="fDir" type="number" placeholder="0–360°" min="0" max="360"></div>
     </div>
 
     <div id="secScan" style="display:none">
-      <div class="fg">
-        <div class="existing-media" id="existingScan" style="display:none">🧊 Current: <a id="existingScanLink" href="#" target="_blank">file</a></div>
-        <label class="replace-label fl" id="scanFileLabel">3D SCAN FILE</label>
+      <div class="fg"><label class="fl">3D SCAN FILE</label>
         <div class="file-drop"><input type="file" id="fScan" accept=".glb,.gltf,.obj,.ply,.usdz,.splat"><div class="fd-icon">🧊</div><div class="fd-txt">UPLOAD SCAN FILE (.glb, .ply, .obj...)</div><div class="fd-name" id="nScan"></div></div>
       </div>
       <div class="fg"><label class="fl">SCAN TYPE</label>
@@ -531,14 +506,20 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px;
       <div class="coord-confirmed" id="coordConfirmed" style="display:none">
         <span id="coordDisplay">—</span>
       </div>
-      <button class="btn-gps" id="btnUseGPS" style="display:none">📡 Use my current GPS position</button>
-      <div style="font-size:.58rem;color:var(--muted);margin-top:5px">Or tap the map to pin a location while this modal is open. You can also search or enter coordinates manually.</div>
+      <button class="btn-gps" id="btnUseGPS">📡 Use my current GPS position</button>
+      <div style="font-size:.58rem;color:var(--muted);margin-top:5px">Or tap the map to pin a location while this modal is open.</div>
 
       <div class="radius-row">
         <span class="radius-label">Trigger radius:</span>
         <input type="range" id="fRadius" min="5" max="200" value="30" oninput="document.getElementById('rVal').textContent=this.value+'m'">
         <span class="radius-val" id="rVal">30m</span>
       </div>
+      <div class="radius-row" style="margin-top:6px">
+        <span class="radius-label">Fade-out radius:</span>
+        <input type="range" id="fFadeRadius" min="0" max="300" value="0" oninput="document.getElementById('fadeRVal').textContent=this.value==='0'?'off':this.value+'m'">
+        <span class="radius-val" id="fadeRVal">off</span>
+      </div>
+      <div style="font-size:.58rem;color:var(--muted);margin-top:4px">Distance from stop at which audio begins fading out. Set to 0 to disable.</div>
     </div>
 
     <div class="up-prog" id="upProg">
@@ -593,7 +574,6 @@ const S = {
   leafletMarkers: {}, circles: {}, userMarker: null,
   currentExpId: null,
   curAudio: null, curAudioEl: null,
-  editingMarkerId: null,   // null = add mode, string = edit mode
 };
 
 // ══════════════════════════════════════
@@ -602,6 +582,7 @@ const S = {
 let map;
 async function init() {
   initMap();
+  setupGPS();
   const [mr, er] = await Promise.all([
     sb.from('markers').select('*').order('created_at', { ascending: true }),
     sb.from('experiences').select('*').order('created_at', { ascending: true }),
@@ -615,20 +596,6 @@ async function init() {
     S.currentExpId = S.experiences[0].id;
     renderSidebar();
     renderEditor();
-    // Fly map to first marker of first experience
-    const firstExp = S.experiences[0];
-    const firstMId = (firstExp.marker_ids || [])[0];
-    const firstM = firstMId ? S.markers.find(m => m.id === firstMId) : null;
-    if (firstM && firstM.lat) map.setView([firstM.lat, firstM.lon], 15);
-  } else if (S.markers.length) {
-    // Fit all markers
-    const geo = S.markers.filter(m => m.lat && m.lon);
-    if (geo.length > 1) {
-      const lats = geo.map(m => m.lat), lons = geo.map(m => m.lon);
-      map.fitBounds([[Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]], { padding: [40,40] });
-    } else if (geo.length === 1) {
-      map.setView([geo[0].lat, geo[0].lon], 15);
-    }
   }
   updateStats();
   toast(`☁ Loaded ${S.experiences.length} exp, ${S.markers.length} items`, 'ok');
@@ -647,6 +614,22 @@ function initMap() {
       toast('📍 Location pinned from map');
     }
   });
+}
+
+function setupGPS() {
+  const dot = document.getElementById('gpsDot');
+  const txt = document.getElementById('gpsText');
+  dot.className = 'gps-dot searching';
+  if (!navigator.geolocation) { txt.textContent = 'NO GPS'; map.setView([51.505, -0.09], 14); return; }
+  navigator.geolocation.watchPosition(pos => {
+    S.userLat = pos.coords.latitude;
+    S.userLon = pos.coords.longitude;
+    dot.className = 'gps-dot active';
+    txt.textContent = S.userLat.toFixed(4) + '°';
+    const ic = L.divIcon({ className: '', html: '<div style="width:18px;height:18px;border-radius:50%;background:var(--signal);border:3px solid var(--ink);box-shadow:0 0 0 4px rgba(232,255,60,.25)"></div>', iconSize: [18,18], iconAnchor: [9,9] });
+    if (S.userMarker) { S.userMarker.setLatLng([S.userLat, S.userLon]); }
+    else { S.userMarker = L.marker([S.userLat, S.userLon], { icon: ic, zIndexOffset: 1000 }).addTo(map); if (!S.leafletMarkers || Object.keys(S.leafletMarkers).length === 0) map.setView([S.userLat, S.userLon], 15); }
+  }, () => { dot.className = 'gps-dot'; txt.textContent = 'NO GPS'; }, { enableHighAccuracy: true, maximumAge: 5000 });
 }
 
 const ICONS = { audio: '🎙', photo: '📷', scan3d: '🧊' };
@@ -752,10 +735,7 @@ function renderItemList(exp) {
           ${m.lat ? `<span class="tag loc">📍 ${m.lat.toFixed(3)}, ${m.lon.toFixed(3)}</span>` : ''}
         </div>
       </div>
-      <div class="item-btns">
-        <button class="btn-edit" onclick="openEditModal('${m.id}')" title="Edit item">✎</button>
-        <button class="btn-remove" onclick="removeItem('${m.id}')" title="Remove from experience">✕</button>
-      </div>
+      <button class="btn-remove" onclick="removeItem('${m.id}')">✕</button>
     </div>`).join('');
 }
 
@@ -844,89 +824,11 @@ function exportExp() {
 // ══════════════════════════════════════
 function openModal() {
   if (!S.currentExpId) { toast('Select or create an experience first', 'err'); return; }
-  S.editingMarkerId = null;
   resetForm();
-  document.getElementById('modalTitle').textContent = 'Add Item';
-  document.getElementById('modalSub').textContent = 'CHOOSE TYPE · UPLOAD MEDIA · SET LOCATION';
-  document.getElementById('btnSubmit').textContent = 'ADD TO EXPERIENCE';
-  document.getElementById('btnSubmit').className = 'btn-submit';
-  // Unlock type cards
-  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('locked'));
-  document.getElementById('modal').classList.add('open');
-}
-
-function openEditModal(markerId) {
-  const m = S.markers.find(x => x.id === markerId);
-  if (!m) return;
-  S.editingMarkerId = markerId;
-  resetForm();
-
-  // Modal header
-  document.getElementById('modalTitle').textContent = 'Edit Item';
-  document.getElementById('modalSub').textContent = 'UPDATE DETAILS · REPLACE MEDIA · MOVE LOCATION';
-
-  // Lock type cards (type can't change after creation)
-  document.querySelectorAll('.type-card').forEach(c => {
-    c.classList.remove('sel', 'photo', 'scan3d', 'locked');
-    if (c.dataset.t === m.type) c.classList.add('sel', m.type);
-    else c.classList.add('locked');
-  });
-  S.itemType = m.type;
-  document.getElementById('secAudio').style.display = m.type === 'audio' ? '' : 'none';
-  document.getElementById('secPhoto').style.display = m.type === 'photo' ? '' : 'none';
-  document.getElementById('secScan').style.display = m.type === 'scan3d' ? '' : 'none';
-
-  // Pre-fill text fields
-  document.getElementById('mTitle').value = m.title || '';
-  document.getElementById('mDesc').value = m.description || '';
-
-  // Show existing media
-  if (m.media_url) {
-    const fname = m.media_name || m.media_url.split('/').pop();
-    if (m.type === 'audio') {
-      document.getElementById('existingAudio').style.display = 'flex';
-      const link = document.getElementById('existingAudioLink');
-      link.href = m.media_url; link.textContent = fname;
-      document.getElementById('audioFileLabel').textContent = 'REPLACE AUDIO FILE (optional)';
-    } else if (m.type === 'photo') {
-      document.getElementById('existingPhoto').style.display = 'flex';
-      const link = document.getElementById('existingPhotoLink');
-      link.href = m.media_url; link.textContent = fname;
-      document.getElementById('photoFileLabel').textContent = 'REPLACE PHOTO (optional)';
-    } else if (m.type === 'scan3d') {
-      document.getElementById('existingScan').style.display = 'flex';
-      const link = document.getElementById('existingScanLink');
-      link.href = m.media_url; link.textContent = fname;
-      document.getElementById('scanFileLabel').textContent = 'REPLACE SCAN FILE (optional)';
-    }
-  }
-
-  // Pre-fill type-specific fields
-  if (m.type === 'photo' && m.direction) document.getElementById('fDir').value = m.direction;
-  if (m.type === 'scan3d' && m.scan_type) document.getElementById('fScanType').value = m.scan_type;
-
-  // Pre-fill location
-  if (m.lat != null && m.lon != null) {
-    setCoords(m.lat, m.lon);
-    // Fly map to current marker position
-    map.setView([m.lat, m.lon], Math.max(map.getZoom(), 15), { animate: true });
-  }
-
-  // Radius
-  const r = m.radius || 30;
-  document.getElementById('fRadius').value = r;
-  document.getElementById('rVal').textContent = r + 'm';
-
-  // Submit button
-  const btn = document.getElementById('btnSubmit');
-  btn.textContent = 'SAVE CHANGES';
-  btn.className = 'btn-submit' + (m.type === 'audio' ? '' : ' ' + m.type);
-
   document.getElementById('modal').classList.add('open');
 }
 function closeModal() {
   document.getElementById('modal').classList.remove('open');
-  S.editingMarkerId = null;
   stopRecording();
   document.getElementById('upProg').classList.remove('show');
   document.getElementById('upStatus').classList.remove('show');
@@ -1016,9 +918,8 @@ function setUpStatus(msg, isErr) {
   if (!isErr) setTimeout(() => el.classList.remove('show'), 4000);
 }
 
-// Submit — handles both ADD and EDIT modes
+// Submit
 document.getElementById('btnSubmit').onclick = async () => {
-  const btn = document.getElementById('btnSubmit');
   const title = document.getElementById('mTitle').value.trim() || document.getElementById('fPlaceName').value.trim() || 'Untitled';
   const desc = document.getElementById('mDesc').value.trim();
   const radius = parseInt(document.getElementById('fRadius').value) || 30;
@@ -1026,71 +927,11 @@ document.getElementById('btnSubmit').onclick = async () => {
   const lonInput = parseFloat(document.getElementById('fLon').value);
   const lat = !isNaN(latInput) ? latInput : (S.pendingLat != null ? S.pendingLat : map.getCenter().lat);
   const lon = !isNaN(lonInput) ? lonInput : (S.pendingLon != null ? S.pendingLon : map.getCenter().lng);
-
-  // ── EDIT MODE ──────────────────────────────────────
-  if (S.editingMarkerId) {
-    const m = S.markers.find(x => x.id === S.editingMarkerId);
-    if (!m) return;
-    btn.disabled = true; btn.textContent = 'SAVING...';
-
-    // Collect new file (if any)
-    let file = null;
-    if (m.type === 'audio') {
-      file = document.getElementById('fAudio').files[0] || null;
-      if (!file && S.recordingBlob) file = new File([S.recordingBlob], 'rec_' + Date.now() + '.webm', { type: 'audio/webm' });
-    } else if (m.type === 'photo') {
-      file = document.getElementById('fPhoto').files[0] || null;
-    } else if (m.type === 'scan3d') {
-      file = document.getElementById('fScan').files[0] || null;
-    }
-
-    // Upload new media if provided
-    if (file) {
-      btn.textContent = 'UPLOADING MEDIA...';
-      const url = await uploadMedia(file, m.id);
-      if (url) { m.media_url = url; m.media_name = file.name; }
-    }
-
-    // Update fields
-    m.title = title;
-    m.description = desc;
-    m.lat = lat;
-    m.lon = lon;
-    m.radius = radius;
-    if (m.type === 'photo') m.direction = document.getElementById('fDir').value || null;
-    if (m.type === 'scan3d') m.scan_type = document.getElementById('fScanType').value;
-
-    btn.textContent = 'SAVING...';
-    const { error } = await sb.from('markers').update({
-      title: m.title, description: m.description,
-      lat: m.lat, lon: m.lon, radius: m.radius,
-      media_url: m.media_url, media_name: m.media_name,
-      direction: m.direction, scan_type: m.scan_type,
-    }).eq('id', m.id);
-
-    btn.disabled = false; btn.textContent = 'SAVE CHANGES';
-    if (error) { toast('Update failed: ' + error.message, 'err'); return; }
-
-    // Refresh map marker + circle at new coords
-    if (S.leafletMarkers[m.id]) { S.leafletMarkers[m.id].remove(); delete S.leafletMarkers[m.id]; }
-    if (S.circles[m.id]) { S.circles[m.id].remove(); delete S.circles[m.id]; }
-    addLeafletMarker(m);
-
-    // Fly map to updated location
-    map.setView([m.lat, m.lon], Math.max(map.getZoom(), 16), { animate: true });
-
-    S.recordingBlob = null;
-    const exp = S.experiences.find(e => e.id === S.currentExpId);
-    if (exp) renderItemList(exp);
-    closeModal();
-    toast('✓ Item updated', 'ok');
-    return;
-  }
-
-  // ── ADD MODE ───────────────────────────────────────
   const id = 'm' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
-  const marker = { id, title, description: desc, type: S.itemType, lat, lon, radius, created_at: new Date().toISOString(), media_url: null, media_name: null, direction: null, scan_type: null };
-  btn.disabled = true; btn.textContent = 'UPLOADING...';
+  const fadeRadiusRaw = parseInt(document.getElementById('fFadeRadius').value) || 0;
+  const fade_radius = fadeRadiusRaw > 0 ? fadeRadiusRaw : null;
+  const marker = { id, title, description: desc, type: S.itemType, lat, lon, radius, fade_radius, created_at: new Date().toISOString(), media_url: null, media_name: null, direction: null, scan_type: null };
+  const btn = document.getElementById('btnSubmit'); btn.disabled = true; btn.textContent = 'UPLOADING...';
   let file = null;
   if (S.itemType === 'audio') { file = document.getElementById('fAudio').files[0] || null; if (!file && S.recordingBlob) file = new File([S.recordingBlob], 'rec_' + Date.now() + '.webm', { type: 'audio/webm' }); }
   else if (S.itemType === 'photo') { file = document.getElementById('fPhoto').files[0] || null; marker.direction = document.getElementById('fDir').value || null; }
@@ -1144,86 +985,10 @@ document.getElementById('btnStop').onclick = () => {
 };
 
 // ══════════════════════════════════════
-// AUTO-SAVE (debounced, fires 800ms after last keystroke)
+// UTILS
 // ══════════════════════════════════════
-let autoSaveTimer = null;
-function scheduleAutoSave() {
-  clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(async () => {
-    const exp = S.experiences.find(e => e.id === S.currentExpId); if (!exp) return;
-    exp.title = document.getElementById('edTitle').value.trim() || 'Untitled';
-    exp.tagline = document.getElementById('edTagline').value.trim();
-    exp.duration = document.getElementById('edDuration').value.trim();
-    exp.description = document.getElementById('edDesc').value.trim();
-    exp.cover_url = document.getElementById('edCover').value.trim();
-    exp.updated_at = new Date().toISOString();
-    const { error } = await sb.from('experiences').upsert(exp);
-    if (!error) {
-      renderSidebar();
-      // Show subtle autosave indicator
-      const badge = document.getElementById('edBadge');
-      const prev = badge.textContent;
-      badge.textContent = '✓ SAVED';
-      setTimeout(() => { badge.textContent = prev; }, 1400);
-    }
-  }, 800);
-}
-
-// Wire auto-save to all editor inputs
-['edTitle','edTagline','edDuration','edDesc','edCover'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('input', scheduleAutoSave);
-});
-
 // ══════════════════════════════════════
-// MAP HEADER SEARCH
-// ══════════════════════════════════════
-let mapSearchTimer = null;
-const mapSearchInput = document.getElementById('mapSearchHdr');
-const mapSearchResults = document.getElementById('mapSearchResultsHdr');
-
-mapSearchInput.addEventListener('input', e => {
-  clearTimeout(mapSearchTimer);
-  const q = e.target.value.trim();
-  if (q.length < 3) { mapSearchResults.classList.remove('open'); return; }
-  mapSearchTimer = setTimeout(() => doMapSearch(q), 400);
-});
-
-mapSearchInput.addEventListener('blur', () => {
-  setTimeout(() => mapSearchResults.classList.remove('open'), 200);
-});
-
-mapSearchInput.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { mapSearchResults.classList.remove('open'); mapSearchInput.blur(); }
-});
-
-async function doMapSearch(q) {
-  mapSearchResults.innerHTML = '<div class="msr-loading">Searching...</div>';
-  mapSearchResults.classList.add('open');
-  try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6`, { headers: { 'Accept-Language': 'en' } });
-    const data = await r.json();
-    if (!data.length) { mapSearchResults.innerHTML = '<div class="msr-loading">No results found</div>'; return; }
-    mapSearchResults.innerHTML = data.map(d => `
-      <div class="msr-item" onclick="flyToMapResult(${d.lat}, ${d.lon}, '${d.display_name.replace(/'/g,"\\'")}')">
-        <div class="msr-name">${d.display_name.split(',')[0]}</div>
-        <div class="msr-sub">${d.display_name.split(',').slice(1,3).join(',').trim()}</div>
-      </div>`).join('');
-  } catch(e) {
-    mapSearchResults.innerHTML = '<div class="msr-loading">Search failed</div>';
-  }
-}
-
-function flyToMapResult(lat, lon, name) {
-  map.setView([parseFloat(lat), parseFloat(lon)], 16, { animate: true });
-  mapSearchInput.value = name.split(',')[0];
-  mapSearchResults.classList.remove('open');
-  toast('🗺 ' + name.split(',')[0]);
-  // Switch to map tab if not already there
-  if (document.getElementById('mapView').style.display === 'none') switchTab('map');
-}
-
-
+// LOCATION SEARCH (Nominatim)
 // ══════════════════════════════════════
 let searchTimer = null;
 document.getElementById('locSearch').addEventListener('input', e => {
@@ -1302,24 +1067,20 @@ function resetForm() {
   closeLocResults();
   ['fAudio','fPhoto','fScan'].forEach(id => document.getElementById(id).value = '');
   ['nAudio','nPhoto','nScan'].forEach(id => document.getElementById(id).textContent = '');
-  // Hide existing-media panels
-  ['existingAudio','existingPhoto','existingScan'].forEach(id => document.getElementById(id).style.display = 'none');
-  document.getElementById('audioFileLabel').textContent = 'AUDIO FILE';
-  document.getElementById('photoFileLabel').textContent = 'PHOTO';
-  document.getElementById('scanFileLabel').textContent = '3D SCAN FILE';
   document.getElementById('fRadius').value = 30; document.getElementById('rVal').textContent = '30m';
+  document.getElementById('fFadeRadius').value = 0; document.getElementById('fadeRVal').textContent = 'off';
   document.getElementById('recTimer').textContent = '00:00'; document.getElementById('recTimer').classList.remove('on');
   document.getElementById('recStatus').textContent = 'Tap to record';
   document.getElementById('fDir').value = ''; S.recordingBlob = null;
-  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('sel', 'photo', 'scan3d', 'locked'));
+  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('sel', 'photo', 'scan3d'));
   document.querySelector('[data-t=audio]').classList.add('sel'); S.itemType = 'audio';
   document.getElementById('secAudio').style.display = '';
   document.getElementById('secPhoto').style.display = 'none';
   document.getElementById('secScan').style.display = 'none';
   document.getElementById('btnSubmit').className = 'btn-submit';
-  document.getElementById('btnSubmit').textContent = 'ADD TO EXPERIENCE';
-  // No GPS pre-fill — user sets location via search or map tap
-  S.pendingLat = null; S.pendingLon = null;
+  // Pre-fill coords from GPS if available
+  if (S.userLat != null) { S.pendingLat = S.userLat; S.pendingLon = S.userLon; setCoords(S.userLat, S.userLon); }
+  else { S.pendingLat = null; S.pendingLon = null; }
 }
 function updateStats() {
   document.getElementById('cA').textContent = S.markers.filter(m => m.type === 'audio').length;
@@ -1333,6 +1094,7 @@ function toast(msg, type = '') {
   el.textContent = msg; el.className = 'toast ' + type + ' show';
   clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 3000);
 }
+document.getElementById('btnLocate').onclick = () => { if (S.userLat) map.setView([S.userLat, S.userLon], 17, { animate: true }); else toast('No GPS signal', 'err'); };
 </script>
 </body>
 </html>
