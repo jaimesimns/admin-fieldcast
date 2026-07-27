@@ -158,6 +158,7 @@ header{display:flex;align-items:center;padding:8px 16px;background:var(--ink);bo
 .tag{padding:1px 5px;border-radius:3px;border:1px solid;font-size:.5rem;}
 .tag.cloud{border-color:rgba(77,223,138,.3);color:var(--ok);}
 .tag.loc{border-color:rgba(60,255,232,.3);color:var(--signal2);}
+.tag.warn{border-color:rgba(255,92,60,.3);color:var(--accent);}
 .irow-btns{display:flex;gap:3px;flex-shrink:0;}
 .irow-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.62rem;transition:all .12s;}
 .irow-btn:hover{border-color:var(--signal2);color:var(--signal2);}
@@ -258,6 +259,8 @@ select.fi{cursor:pointer;}
 .ie-save.photo{background:var(--signal2);}
 .ie-save.scan3d{background:var(--accent);color:#fff;}
 .ie-cancel{display:block;width:100%;margin-top:5px;padding:8px;background:transparent;border:none;color:var(--muted);font-family:'DM Mono',monospace;font-size:.68rem;cursor:pointer;}
+.ie-delete{display:block;width:100%;margin-top:8px;padding:9px;border-radius:8px;border:1px solid rgba(255,92,60,.35);background:rgba(255,92,60,.06);color:var(--accent);font-family:'DM Mono',monospace;font-size:.66rem;letter-spacing:.04em;cursor:pointer;transition:all .15s;}
+.ie-delete:hover{background:rgba(255,92,60,.14);}
 
 /* MAP */
 #mapArea{flex:1;position:relative;min-width:0;}
@@ -380,6 +383,7 @@ select.fi{cursor:pointer;}
       <div class="panel-hdr">
         <span class="panel-title" id="mapPanelTitle">Items</span>
         <div class="panel-actions">
+          <button class="pa-btn" onclick="viewUnassigned()" title="Browse items not linked to any experience">⚠ Unassigned</button>
           <button class="pa-btn add" onclick="openItemEditor(null)">+ Add item</button>
         </div>
       </div>
@@ -763,10 +767,53 @@ function scheduleAutoSave(){
 // ═══════════════════════════════════════════════
 // ITEM LIST (map panel)
 // ═══════════════════════════════════════════════
+// Items not referenced by any experience's marker_ids — e.g. left behind
+// after an experience was deleted ("Items will not be deleted"), or removed
+// from a list with the ✕ button. Otherwise invisible/unreachable once their
+// experience is gone, so they get their own browsable list here.
+function getUnassignedMarkers(){
+  const assigned=new Set();
+  S.experiences.forEach(e=>(e.marker_ids||[]).forEach(id=>assigned.add(id)));
+  return S.markers.filter(m=>!assigned.has(m.id));
+}
+
+function viewUnassigned(){
+  S.currentExpId=null;
+  switchTab('map');
+  renderExpList(); renderItemList();
+}
+
 function renderItemList(){
   const exp=S.experiences.find(e=>e.id===S.currentExpId);
   const rows=document.getElementById('itemRows');
-  if(!exp){rows.innerHTML='<div class="irow-empty">Select an experience first.</div>';return;}
+  const panelTitle=document.getElementById('mapPanelTitle');
+  if(!exp){
+    if(panelTitle) panelTitle.textContent='Unassigned items';
+    const orphans=getUnassignedMarkers();
+    if(!orphans.length){rows.innerHTML='<div class="irow-empty">No unassigned items.<br>Select an experience to see its items.</div>';return;}
+    rows.innerHTML=orphans.map(m=>`
+      <div class="irow${S.editingMarkerId===m.id?' active-row':''}"
+          onclick="onItemRowClick('${m.id}')"
+          ondblclick="openItemEditor('${m.id}')"
+          title="Click to preview · Double-click to edit">
+        <div class="irow-icon">${ICONS[m.type]||'📍'}</div>
+        <div class="irow-info">
+          <div class="irow-title">${escHtml(m.title)}</div>
+          <div class="irow-meta">
+            <span>${m.type.toUpperCase()}</span>
+            <span class="tag warn">unassigned</span>
+            ${m.media_url?'<span class="tag cloud">☁</span>':''}
+            ${m.lat!=null?`<span class="tag loc">📍${m.lat.toFixed(3)},${m.lon.toFixed(3)}</span>`:''}
+          </div>
+        </div>
+        <span class="dbl-hint">✎ dbl</span>
+        <div class="irow-btns">
+          <button class="irow-btn del" onclick="event.stopPropagation();deleteItem('${m.id}')" title="Delete permanently">✕</button>
+        </div>
+      </div>`).join('');
+    return;
+  }
+  if(panelTitle) panelTitle.textContent=exp.title||'Untitled';
   const ids=exp.marker_ids||[];
   if(!ids.length){rows.innerHTML='<div class="irow-empty">No items yet.<br>Click + Add item to begin.</div>';return;}
   const items=ids.map(id=>S.markers.find(m=>m.id===id)).filter(Boolean);
@@ -935,6 +982,7 @@ function buildItemEditorForm(m) {
     <div class="up-status" id="upStatus"></div>
 
     <button class="ie-save ${S.itemType!=='audio'?S.itemType:''}" id="ieSaveBtn" onclick="saveItem()">${isEdit?'SAVE CHANGES':'ADD TO EXPERIENCE'}</button>
+    ${isEdit?`<button class="ie-delete" onclick="deleteItem('${m.id}')">DELETE ITEM PERMANENTLY</button>`:''}
     <button class="ie-cancel" onclick="closeItemEditor()">cancel</button>
   `;
 
@@ -1236,6 +1284,34 @@ async function removeItem(markerId){
   exp.marker_ids=(exp.marker_ids||[]).filter(x=>x!==markerId);
   await sb.from('experiences').update({marker_ids:exp.marker_ids,updated_at:new Date().toISOString()}).eq('id',exp.id);
   renderItemList(); renderEdItemList(exp); toast('Item removed');
+}
+
+// Permanently deletes a marker row, regardless of whether it's currently
+// linked to an experience — unlinks it from every experience that still
+// references it (e.g. a leftover from a deleted experience) so no dangling
+// ids remain in any marker_ids array.
+async function deleteItem(markerId){
+  const m=S.markers.find(x=>x.id===markerId); if(!m) return;
+  if(!confirm(`Delete "${m.title||'this item'}" permanently? This cannot be undone.`)) return;
+
+  const{error}=await sb.from('markers').delete().eq('id',markerId);
+  if(error){toast('Delete failed: '+error.message,'err');return;}
+
+  const affected=S.experiences.filter(e=>(e.marker_ids||[]).includes(markerId));
+  for(const e of affected){
+    e.marker_ids=(e.marker_ids||[]).filter(x=>x!==markerId);
+    e.updated_at=new Date().toISOString();
+    await sb.from('experiences').update({marker_ids:e.marker_ids,updated_at:e.updated_at}).eq('id',e.id);
+  }
+
+  S.markers=S.markers.filter(x=>x.id!==markerId);
+  removeMapMarker(markerId);
+  if(S.editingMarkerId===markerId) closeItemEditor();
+
+  renderItemList(); renderExpList(); updateStats();
+  const openExp=S.experiences.find(e=>e.id===S.currentExpId);
+  if(openExp && document.getElementById('expEditorPanel').style.display!=='none') renderEdItemList(openExp);
+  toast('✓ Item deleted','ok');
 }
 
 // ═══════════════════════════════════════════════
