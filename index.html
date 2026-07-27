@@ -99,6 +99,7 @@ header{display:flex;align-items:center;padding:8px 16px;background:var(--ink);bo
 .ec-meta{font-size:.56rem;color:var(--muted);}
 .ec-badge{display:inline-block;font-size:.5rem;padding:1px 6px;border-radius:8px;border:1px solid;margin-top:3px;}
 .ec-badge.published{border-color:var(--signal);color:var(--signal);}
+.ec-badge.coming_soon{border-color:var(--accent);color:var(--accent);}
 .ec-badge.draft{border-color:var(--border);color:var(--muted);}
 
 /* Exp editor */
@@ -112,6 +113,12 @@ header{display:flex;align-items:center;padding:8px 16px;background:var(--ink);bo
 .status-badge{font-size:.52rem;padding:2px 7px;border-radius:9px;border:1px solid;flex-shrink:0;}
 .status-badge.published{border-color:var(--signal);color:var(--signal);background:rgba(232,255,60,.07);}
 .status-badge.draft{border-color:var(--border);color:var(--muted);}
+.status-seg{display:flex;gap:4px;margin-bottom:8px;}
+.seg-btn{flex:1;padding:6px 4px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:.56rem;letter-spacing:.03em;cursor:pointer;transition:all .15s;}
+.seg-btn:hover{border-color:rgba(255,255,255,.25);}
+.seg-btn.on.draft{border-color:var(--muted);color:var(--paper);background:rgba(255,255,255,.06);}
+.seg-btn.on.coming_soon{border-color:var(--accent);color:var(--accent);background:rgba(255,92,60,.08);}
+.seg-btn.on.published{border-color:var(--signal);color:var(--signal);background:rgba(232,255,60,.08);}
 .ed-fields{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;}
 .ed-inp{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:5px;padding:6px 9px;color:var(--paper);font-family:'DM Mono',monospace;font-size:.68rem;outline:none;transition:border-color .2s;}
 .ed-inp:focus{border-color:var(--exp);}
@@ -318,8 +325,9 @@ select.fi{cursor:pointer;}
     <div class="setup-step"><div class="step-num">2</div><div>Storage → New Bucket → <code>fieldcast-media</code> (Public)</div></div>
     <div class="setup-step"><div class="step-num">3</div><div>Run this schema in the SQL Editor:</div></div>
     <div class="sql-block"><b>create table</b> markers (
-  id text primary key, title text not null, description text,
-  type text not null, lat float8, lon float8,
+  id text primary key, title text not null, excerpt text, description text,
+  type text not null default 'audio' check (type in ('audio','photo','scan3d')),
+  lat float8, lon float8,
   radius int4 default 30, fade_radius int4 default 80,
   vol_center int4 default 100, vol_edge int4 default 0,
   media_url text, media_name text, direction text, scan_type text,
@@ -327,8 +335,9 @@ select.fi{cursor:pointer;}
 );
 <b>create table</b> experiences (
   id text primary key, title text not null, tagline text,
-  description text, cover_url text, duration text,
-  status text default 'draft', marker_ids text[] default '{}',
+  description text, location_label text, cover_url text, duration text,
+  status text default 'draft' check (status in ('draft','coming_soon','published')),
+  marker_ids text[] default '{}',
   created_at timestamptz default now(), updated_at timestamptz default now()
 );
 <b>alter table</b> markers <b>enable row level security</b>;
@@ -406,17 +415,21 @@ select.fi{cursor:pointer;}
           <div class="ed-meta-sec">
             <div class="ed-title-row">
               <input class="ed-title-inp" id="edTitle" placeholder="Experience title…" maxlength="80">
-              <span class="status-badge draft" id="edBadge">DRAFT</span>
             </div>
             <div class="ed-fields">
               <input class="ed-inp" id="edTagline" placeholder="Tagline…">
+              <input class="ed-inp" id="edLocation" placeholder="Location e.g. ENCI Quarry">
               <input class="ed-inp" id="edDuration" placeholder="Duration e.g. 45 min">
               <input class="ed-inp full" id="edDesc" placeholder="Description for visitors…">
               <input class="ed-inp full" id="edCover" placeholder="Cover image URL (optional)">
             </div>
+            <div class="status-seg" id="statusSeg">
+              <button class="seg-btn" data-status="draft" onclick="setStatus('draft')">DRAFT</button>
+              <button class="seg-btn" data-status="coming_soon" onclick="setStatus('coming_soon')">COMING SOON</button>
+              <button class="seg-btn" data-status="published" onclick="setStatus('published')">PUBLISHED</button>
+            </div>
             <div class="ed-actions">
               <button class="ed-btn save" onclick="saveExp()">☁ SAVE</button>
-              <button class="ed-btn pub" id="btnPublish" onclick="togglePublish()">PUBLISH</button>
               <button class="ed-btn exp-btn" onclick="exportExp()">↓ JSON</button>
               <button class="ed-btn del" onclick="deleteExp()">DELETE</button>
             </div>
@@ -529,6 +542,14 @@ function initMap() {
 
 const ICONS = { audio:'🎙', photo:'📷', scan3d:'🧊' };
 const COLS  = { audio:'#e8ff3c', photo:'#3cffe8', scan3d:'#ff5c3c' };
+const STATUS_LABEL = { draft:'DRAFT', coming_soon:'SOON', published:'LIVE' };
+
+function highlightStatusSeg(status){
+  document.querySelectorAll('#statusSeg .seg-btn').forEach(b=>{
+    b.classList.toggle('on',b.dataset.status===status);
+    b.classList.toggle(b.dataset.status,b.dataset.status===status);
+  });
+}
 
 function mkIcon(m, active=false) {
   return L.divIcon({className:'',html:`<div class="mk"><div class="mk-lbl">${escHtml(m.title)}</div><div class="mk-ring ${m.type}${active?' isactive':''}"><span style="font-size:.85rem">${ICONS[m.type]||'📍'}</span></div></div>`,iconSize:[34,34],iconAnchor:[17,17]});
@@ -635,7 +656,7 @@ function switchTab(t) {
   document.getElementById('htabExp').classList.toggle('on',t==='exp');
   document.getElementById('mapPanel').style.display  = t==='map'  ? 'flex':'none';
   document.getElementById('expPanel').style.display  = t==='exp'  ? 'flex':'none';
-  setTimeout(()=>map.invalidateSize(),60);
+  setTimeout(()=>map&&map.invalidateSize(),60);
 }
 
 // ═══════════════════════════════════════════════
@@ -653,7 +674,7 @@ function renderExpList() {
         title="Double-click to open editor">
       <div class="ec-title">${escHtml(exp.title||'Untitled')}<span class="dbl-hint">✎ edit</span></div>
       <div class="ec-meta">${n} stop${n!==1?'s':''}</div>
-      <span class="ec-badge ${exp.status||'draft'}">${(exp.status||'draft').toUpperCase()}</span>
+      <span class="ec-badge ${exp.status||'draft'}">${STATUS_LABEL[exp.status]||'DRAFT'}</span>
     </div>`;
   }).join('');
   updateStats();
@@ -677,12 +698,11 @@ function openExpEditor(id) {
   const ep=document.getElementById('expEditorPanel'); ep.style.display='flex';
   document.getElementById('edTitle').value=exp.title||'';
   document.getElementById('edTagline').value=exp.tagline||'';
+  document.getElementById('edLocation').value=exp.location_label||'';
   document.getElementById('edDuration').value=exp.duration||'';
   document.getElementById('edDesc').value=exp.description||'';
   document.getElementById('edCover').value=exp.cover_url||'';
-  const b=document.getElementById('edBadge');
-  b.textContent=(exp.status||'draft').toUpperCase(); b.className='status-badge '+(exp.status==='published'?'published':'draft');
-  document.getElementById('btnPublish').textContent=exp.status==='published'?'UNPUBLISH':'PUBLISH';
+  highlightStatusSeg(exp.status||'draft');
   renderEdItemList(exp);
 }
 function closeExpEditor(){
@@ -722,6 +742,7 @@ function scheduleAutoSave(){
     const exp=S.experiences.find(e=>e.id===S.currentExpId); if(!exp) return;
     exp.title=document.getElementById('edTitle').value.trim()||'Untitled';
     exp.tagline=document.getElementById('edTagline').value.trim();
+    exp.location_label=document.getElementById('edLocation').value.trim();
     exp.duration=document.getElementById('edDuration').value.trim();
     exp.description=document.getElementById('edDesc').value.trim();
     exp.cover_url=document.getElementById('edCover').value.trim();
@@ -730,12 +751,12 @@ function scheduleAutoSave(){
     if(!error){
       renderExpList();
       document.getElementById('mapPanelTitle').textContent=exp.title||'Untitled';
-      const b=document.getElementById('edBadge'),prev=b.textContent;
+      const b=document.querySelector('.ed-btn.save'),prev=b.textContent;
       b.textContent='✓ SAVED'; setTimeout(()=>b.textContent=prev,1400);
     }
   },800);
 }
-['edTitle','edTagline','edDuration','edDesc','edCover'].forEach(id=>{
+['edTitle','edTagline','edLocation','edDuration','edDesc','edCover'].forEach(id=>{
   const el=document.getElementById(id); if(el) el.addEventListener('input',scheduleAutoSave);
 });
 
@@ -834,6 +855,7 @@ function buildItemEditorForm(m) {
   document.getElementById('ieScroll').innerHTML = `
     <div class="ie-type-row">${typeChips}</div>
     <div class="fg"><label class="fl">Title</label><input class="fi" id="ieTitle" value="${escHtml(m?.title||'')}" placeholder="Name this stop…"></div>
+    <div class="fg"><label class="fl">Excerpt (short teaser)</label><input class="fi" id="ieExcerpt" value="${escHtml(m?.excerpt||'')}" placeholder="One sentence shown before visitors expand the full text…"></div>
     <div class="fg"><label class="fl">Description</label><textarea class="fi" id="ieDesc" placeholder="What will visitors encounter?">${escHtml(m?.description||'')}</textarea></div>
 
     <div id="ieSecAudio" style="display:${S.itemType==='audio'?'block':'none'}">
@@ -1102,6 +1124,7 @@ async function saveItem(){
   const btn=document.getElementById('ieSaveBtn'); if(!btn) return;
   btn.disabled=true; btn.textContent='SAVING…';
   const title=(document.getElementById('ieTitle')?.value||'').trim()||'Untitled';
+  const excerpt=(document.getElementById('ieExcerpt')?.value||'').trim();
   const desc=(document.getElementById('ieDesc')?.value||'').trim();
   const latV=parseFloat(document.getElementById('ieLat')?.value);
   const lonV=parseFloat(document.getElementById('ieLon')?.value);
@@ -1120,11 +1143,11 @@ async function saveItem(){
   if(S.editingMarkerId){
     const m=S.markers.find(x=>x.id===S.editingMarkerId); if(!m){btn.disabled=false;return;}
     if(file){btn.textContent='UPLOADING…';const url=await uploadMedia(file,m.id);if(url){m.media_url=url;m.media_name=file.name;}}
-    m.title=title;m.description=desc;m.lat=lat;m.lon=lon;
+    m.title=title;m.excerpt=excerpt;m.description=desc;m.lat=lat;m.lon=lon;
     m.radius=coreR;m.fade_radius=fadeR;m.vol_center=volC;m.vol_edge=volE;
     if(m.type==='photo')m.direction=document.getElementById('fDir')?.value||null;
     if(m.type==='scan3d')m.scan_type=document.getElementById('fScanType')?.value;
-    const{error}=await sb.from('markers').update({title:m.title,description:m.description,lat:m.lat,lon:m.lon,radius:m.radius,fade_radius:m.fade_radius,vol_center:m.vol_center,vol_edge:m.vol_edge,media_url:m.media_url,media_name:m.media_name,direction:m.direction,scan_type:m.scan_type}).eq('id',m.id);
+    const{error}=await sb.from('markers').update({title:m.title,excerpt:m.excerpt,description:m.description,lat:m.lat,lon:m.lon,radius:m.radius,fade_radius:m.fade_radius,vol_center:m.vol_center,vol_edge:m.vol_edge,media_url:m.media_url,media_name:m.media_name,direction:m.direction,scan_type:m.scan_type}).eq('id',m.id);
     btn.disabled=false; btn.textContent='SAVE CHANGES';
     if(error){toast('Update failed: '+error.message,'err');return;}
     refreshMapMarker(m);
@@ -1137,7 +1160,7 @@ async function saveItem(){
   } else {
     if(!S.currentExpId){toast('Select or create an experience first','err');btn.disabled=false;btn.textContent='ADD TO EXPERIENCE';return;}
     const id='m'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-    const marker={id,title,description:desc,type:S.itemType,lat,lon,radius:coreR,fade_radius:fadeR,vol_center:volC,vol_edge:volE,created_at:new Date().toISOString(),media_url:null,media_name:null,direction:null,scan_type:null};
+    const marker={id,title,excerpt,description:desc,type:S.itemType,lat,lon,radius:coreR,fade_radius:fadeR,vol_center:volC,vol_edge:volE,created_at:new Date().toISOString(),media_url:null,media_name:null,direction:null,scan_type:null};
     if(S.itemType==='photo')marker.direction=document.getElementById('fDir')?.value||null;
     if(S.itemType==='scan3d')marker.scan_type=document.getElementById('fScanType')?.value;
     if(file){marker.media_name=file.name;btn.textContent='UPLOADING…';const url=await uploadMedia(file,id);if(url)marker.media_url=url;}
@@ -1160,7 +1183,7 @@ async function saveItem(){
 // EXPERIENCE CRUD
 // ═══════════════════════════════════════════════
 function newExp(){
-  const exp={id:'e'+Date.now(),title:'',tagline:'',description:'',cover_url:'',duration:'',status:'draft',marker_ids:[],created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  const exp={id:'e'+Date.now(),title:'',tagline:'',location_label:'',description:'',cover_url:'',duration:'',status:'draft',marker_ids:[],created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
   S.experiences.unshift(exp); S.currentExpId=exp.id;
   switchTab('exp'); renderExpList(); openExpEditor(exp.id);
   setTimeout(()=>document.getElementById('edTitle')?.focus(),60);
@@ -1169,6 +1192,7 @@ async function saveExp(){
   const exp=S.experiences.find(e=>e.id===S.currentExpId); if(!exp) return;
   exp.title=document.getElementById('edTitle').value.trim()||'Untitled';
   exp.tagline=document.getElementById('edTagline').value.trim();
+  exp.location_label=document.getElementById('edLocation').value.trim();
   exp.duration=document.getElementById('edDuration').value.trim();
   exp.description=document.getElementById('edDesc').value.trim();
   exp.cover_url=document.getElementById('edCover').value.trim();
@@ -1177,11 +1201,13 @@ async function saveExp(){
   if(!error){renderExpList();document.getElementById('mapPanelTitle').textContent=exp.title||'Untitled';toast('☁ Saved','ok');}
   else toast('Save failed: '+error.message,'err');
 }
-async function togglePublish(){
+async function setStatus(status){
   const exp=S.experiences.find(e=>e.id===S.currentExpId); if(!exp) return;
-  exp.status=exp.status==='published'?'draft':'published'; exp.updated_at=new Date().toISOString();
-  await sb.from('experiences').update({status:exp.status,updated_at:exp.updated_at}).eq('id',exp.id);
-  renderExpList(); openExpEditor(exp.id); toast(exp.status==='published'?'✓ Published':'Set to draft');
+  exp.status=status; exp.updated_at=new Date().toISOString();
+  const{error}=await sb.from('experiences').update({status:exp.status,updated_at:exp.updated_at}).eq('id',exp.id);
+  if(error){toast('Status update failed: '+error.message,'err');return;}
+  renderExpList(); highlightStatusSeg(status);
+  toast(status==='published'?'✓ Published':status==='coming_soon'?'✓ Marked coming soon':'Set to draft','ok');
 }
 async function deleteExp(){
   if(!confirm('Delete this experience? Items will not be deleted.')) return;
@@ -1191,8 +1217,8 @@ async function deleteExp(){
 }
 function exportExp(){
   const exp=S.experiences.find(e=>e.id===S.currentExpId); if(!exp) return;
-  const items=(exp.marker_ids||[]).map(id=>S.markers.find(m=>m.id===id)).filter(Boolean).map((m,i)=>({order:i+1,id:m.id,title:m.title,description:m.description||'',type:m.type,lat:m.lat,lon:m.lon,radius:m.radius||30,fade_radius:m.fade_radius||80,vol_center:m.vol_center??100,vol_edge:m.vol_edge??0,media_url:m.media_url||null,media_name:m.media_name||null}));
-  const payload={fieldcast_version:2,exported:new Date().toISOString(),experience:{id:exp.id,title:exp.title,tagline:exp.tagline||'',description:exp.description||'',cover_url:exp.cover_url||'',duration:exp.duration||'',status:exp.status},items};
+  const items=(exp.marker_ids||[]).map(id=>S.markers.find(m=>m.id===id)).filter(Boolean).map((m,i)=>({order:i+1,id:m.id,title:m.title,excerpt:m.excerpt||'',description:m.description||'',type:m.type,lat:m.lat,lon:m.lon,radius:m.radius||30,fade_radius:m.fade_radius||80,vol_center:m.vol_center??100,vol_edge:m.vol_edge??0,media_url:m.media_url||null,media_name:m.media_name||null}));
+  const payload={fieldcast_version:2,exported:new Date().toISOString(),experience:{id:exp.id,title:exp.title,tagline:exp.tagline||'',location_label:exp.location_label||'',description:exp.description||'',cover_url:exp.cover_url||'',duration:exp.duration||'',status:exp.status},items};
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.download=(exp.title||'experience').toLowerCase().replace(/\s+/g,'-')+'.json';a.click();URL.revokeObjectURL(a.href);toast('↓ Exported','ok');
 }
 
